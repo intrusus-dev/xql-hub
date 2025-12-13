@@ -12,12 +12,10 @@ mitre_ids:
   - "T1059.001"
   - "T1059"
 log_sources:
-  - "Microsoft Windows"
-  - "Cortex XDR"
-query: |
+  - "Cortex XDR Agent"
+query:
   dataset = xdr_data 
   | filter event_type = PROCESS
   | filter action_process_image_name ~= "powershell"
   | filter action_process_command_line ~= "encodedcommand|bypass|downloadstring|invoke-expression|iex|webclient"
-  | fields _time, agent_hostname, action_process_image_name, 
-           action_process_command_line, actor_process_image_name
+  | fields _time, agent_hostname, action_process_image_name, action_process_command_line, actor_process_image_name

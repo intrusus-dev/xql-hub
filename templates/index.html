@@ -32,15 +32,6 @@
             </select>
         </div>
 
-        <div class="filter-group">
-            <label>Category</label>
-            <select name="category" id="filter-category" class="filter-select" onchange="onFilterChange()">
-                <option value="all">All Categories</option>
-                {% for c in filters.categories %}
-                <option value="{{ c }}">{{ c }}</option>
-                {% endfor %}
-            </select>
-        </div>
 
         <div class="filter-group">
             <label>Log Source</label>
@@ -180,13 +171,11 @@
         // Get currently filtered queries based on dropdown selections
         function getFilteredQueries() {
             const contentType = document.getElementById('filter-content-type')?.value || 'all';
-            const category = document.getElementById('filter-category')?.value || 'all';
             const logSource = document.getElementById('filter-log-source')?.value || 'all';
             const searchQuery = document.getElementById('search-input')?.value?.toLowerCase() || '';
 
             return allQueries.filter(q => {
                 if (contentType !== 'all' && q.content_type !== contentType) return false;
-                if (category !== 'all' && q.category !== category) return false;
                 if (logSource !== 'all' && !(q.log_sources || []).includes(logSource)) return false;
                 if (searchQuery && !JSON.stringify(q).toLowerCase().includes(searchQuery)) return false;
                 return true;
@@ -363,7 +352,6 @@
 
             // Reset dropdowns
             document.getElementById('filter-content-type').value = 'all';
-            document.getElementById('filter-category').value = 'all';
             document.getElementById('filter-log-source').value = 'all';
             document.getElementById('search-input').value = '';
 
@@ -386,9 +374,6 @@
 
             const contentType = document.getElementById('filter-content-type')?.value || 'all';
             if (contentType !== 'all') params.append('content_type', contentType);
-
-            const category = document.getElementById('filter-category')?.value || 'all';
-            if (category !== 'all') params.append('category', category);
 
             const logSource = document.getElementById('filter-log-source')?.value || 'all';
             if (logSource !== 'all') params.append('log_source', logSource);

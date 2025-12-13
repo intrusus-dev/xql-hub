@@ -14,7 +14,7 @@ mitre_ids:
   - "T1098"
   - "T1078.002"
 log_sources:
-  - "Microsoft Windows"
+  - "Windows Event Logs"
 query: |
   dataset = microsoft_windows_raw 
   | filter event_id in (4728, 4732, 4756)

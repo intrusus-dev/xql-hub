@@ -1,5 +1,5 @@
 name: "LSASS Memory Access Detection"
-author: "xql-hub-admin"
+author: "Leon Schulze"
 description: "Detects attempts to access LSASS process memory, which is commonly used by credential dumping tools like Mimikatz to extract passwords and hashes from memory."
 severity: "Critical"
 content_type: bioc
@@ -12,7 +12,6 @@ mitre_ids:
   - "T1003.001"
   - "T1003"
 log_sources:
-  - "Windows Event Logs"
   - "Cortex XDR Agent"
 query:
   dataset = xdr_data 
