@@ -1,6 +1,7 @@
 name: "Endpoint Connection and Protection Status"
 author: "Joe Rzepka"
 description: "This query can be used to see a pie graph of endpoint totals depending on their connection status and their protection level"
+content_type: hygiene
 tags:
   - "EDR"
   - "NoAPI"
