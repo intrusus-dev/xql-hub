@@ -25,6 +25,31 @@ We are building towards a comprehensive "GitOps" driven content hub.
 * **Phase 3:** Parsers and Custom Dashboards.
 * **Phase 4:** Automatic validation (CI/CD) of submitted content.
 
+## 📁 Query Schema
+
+Each query is defined in a YAML file with the following structure:
+
+```yaml
+name: "Query Name"
+author: "your-handle"
+description: "What this query detects"
+severity: "Low|Medium|High|Critical"
+content_type: xql|correlation|bioc
+category: "Identity & Access|Endpoint Security|Network|..."
+mitre_ids:
+  - "T1098.007"
+  - "T1078"
+log_sources:
+  - "Microsoft Windows"
+  - "Cortex XDR"
+tags:
+  - "Tag1"
+  - "Tag2"
+query: |
+  dataset = ... 
+  | filter ...
+```
+
 ## 🤝 How to Contribute
 We're currently building up the project.
 Feel free to contribute after we published it.

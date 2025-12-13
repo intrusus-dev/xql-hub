@@ -1,10 +1,11 @@
 import os
+from typing import List
+
 import yaml
 from fastapi import FastAPI, Request, Query
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse, JSONResponse
-from typing import List, Optional
 
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -39,13 +40,10 @@ MITRE_TACTICS = [
 
 def get_tactic_for_technique(technique_id: str) -> str:
     """Map technique IDs to tactics based on known mappings."""
-    # This is a simplified mapping - in production you'd want a complete mapping
-    # or fetch from MITRE ATT&CK STIX data
+
     tactic_map = {
-        # Privilege Escalation & Persistence
-        "T1098": "TA0003",  # Account Manipulation -> Persistence
-        "T1078": "TA0001",  # Valid Accounts -> Initial Access
-        # Add more mappings as needed
+        "T1098": "TA0003",
+        "T1078": "TA0001",
     }
     base_id = technique_id.split('.')[0]
     return tactic_map.get(base_id, "")
@@ -151,7 +149,7 @@ async def search(
             def matches_mitre(query_item):
                 query_mitre = query_item.get('mitre_ids', [])
                 for selected in mitre:
-                    # Check exact match or if it's a parent technique
+                    # Check the exact match or if it's a parent technique
                     for qm in query_mitre:
                         if qm == selected or qm.startswith(selected + '.'):
                             return True
