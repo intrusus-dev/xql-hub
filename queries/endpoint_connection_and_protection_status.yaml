@@ -5,13 +5,12 @@ content_type: hygiene
 tags:
   - "EDR"
   - "NoAPI"
-  - "AllOS",
+  - "AllOS"
   - "PANWOpen"
 log_sources:
   - "Cortex XDR Agent"
 query:
-  config case_sensitive = false
-  | dataset = endpoints
+  dataset = endpoints
   | fields endpoint_status, operational_status
   | comp count(operational_status ) by endpoint_status, operational_status
   | alter Stats = concat(endpoint_status," - ", operational_status )

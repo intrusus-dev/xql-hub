@@ -12,7 +12,7 @@ mitre_ids:
   - "T1021.001"
   - "T1021"
 log_sources:
-  - "Microsoft Windows"
+  - "Windows Event Logs"
 query: |
   dataset = microsoft_windows_raw 
   | filter event_id in (4624, 4625)
