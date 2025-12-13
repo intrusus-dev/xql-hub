@@ -1,5 +1,6 @@
 import os
 import yaml
+import subprocess
 from fastapi import FastAPI, Request, Query
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -14,8 +15,7 @@ QUERY_DB = []
 FILTER_OPTIONS = {
     "mitre_ids": set(),
     "log_sources": set(),
-    "types": set(),
-    "categories": set()
+    "types": set()
 }
 
 # MITRE ATT&CK Enterprise Tactics (in kill chain order)
@@ -35,20 +35,6 @@ MITRE_TACTICS = [
     {"id": "TA0010", "name": "Exfiltration", "shortname": "exfil"},
     {"id": "TA0040", "name": "Impact", "shortname": "impact"},
 ]
-
-
-def get_tactic_for_technique(technique_id: str) -> str:
-    """Map technique IDs to tactics based on known mappings."""
-    # This is a simplified mapping - in production you'd want a complete mapping
-    # or fetch from MITRE ATT&CK STIX data
-    tactic_map = {
-        # Privilege Escalation & Persistence
-        "T1098": "TA0003",  # Account Manipulation -> Persistence
-        "T1078": "TA0001",  # Valid Accounts -> Initial Access
-        # Add more mappings as needed
-    }
-    base_id = technique_id.split('.')[0]
-    return tactic_map.get(base_id, "")
 
 
 def load_queries():
@@ -71,12 +57,9 @@ def load_queries():
                             data['mitre_ids'] = []
                         if 'log_sources' not in data:
                             data['log_sources'] = []
-                        if 'category' not in data:
-                            data['category'] = 'Uncategorized'
 
                         # Populate Filter Lists
                         FILTER_OPTIONS["types"].add(data['content_type'])
-                        FILTER_OPTIONS["categories"].add(data['category'])
 
                         for mid in data['mitre_ids']:
                             FILTER_OPTIONS["mitre_ids"].add(mid)
@@ -129,7 +112,6 @@ async def search(
         q: str = "",
         content_type: str = "",
         mitre: List[str] = Query(default=[]),
-        category: str = "",
         log_source: str = ""
 ):
     filtered = QUERY_DB
@@ -159,11 +141,7 @@ async def search(
 
             filtered = [x for x in filtered if matches_mitre(x)]
 
-    # 4. Filter by Category
-    if category and category != "all":
-        filtered = [x for x in filtered if x.get('category') == category]
-
-    # 5. Filter by Log Source
+    # 4. Filter by Log Source
     if log_source and log_source != "all":
         filtered = [x for x in filtered if log_source in x.get('log_sources', [])]
 
@@ -178,12 +156,26 @@ async def get_filters():
     """API endpoint to get all available filter options."""
     return {
         "types": sorted(list(FILTER_OPTIONS["types"])),
-        "categories": sorted(list(FILTER_OPTIONS["categories"])),
         "log_sources": sorted(list(FILTER_OPTIONS["log_sources"])),
         "mitre_ids": sorted(list(FILTER_OPTIONS["mitre_ids"])),
         "tactics": MITRE_TACTICS
     }
 
+@app.post("/webhook/refresh")
+async def refresh_content(request: Request):
+    """
+    Called by GitHub Webhook. Pulls latest changes and reloads memory.
+    """
+    try:
+        # 1. Pull latest code from git
+        subprocess.run(["git", "pull"], check=True)
+
+        # 2. Reload the queries into memory
+        load_queries()
+
+        return {"status": "success", "message": "Content updated"}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 if __name__ == "__main__":
     import uvicorn
