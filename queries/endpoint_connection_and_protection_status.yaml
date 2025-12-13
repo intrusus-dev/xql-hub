@@ -1,0 +1,27 @@
+name: "Endpoint Connection and Protection Status"
+author: "Joe Rzepka"
+description: "This query can be used to see a pie graph of endpoint totals depending on their connection status and their protection level"
+content_type: hygiene
+tags:
+  - "EDR"
+  - "NoAPI"
+  - "AllOS",
+  - "PANWOpen"
+log_sources:
+  - "Cortex XDR Agent"
+query:
+  config case_sensitive = false
+  | dataset = endpoints
+  | fields endpoint_status, operational_status
+  | comp count(operational_status ) by endpoint_status, operational_status
+  | alter Stats = concat(endpoint_status," - ", operational_status )
+  | alter Stats = if (Stats contains "STATUS_020_LOST - PARTIALLY_PROTECTED", replace(Stats,"STATUS_020_LOST - PARTIALLY_PROTECTED","CONNECTION LOST - PARTIALLY PROTECTED"),Stats )
+  | alter Stats = if (Stats contains "STATUS_040_DISCONNECTED - PARTIALLY_PROTECTED", replace(Stats,"STATUS_040_DISCONNECTED - PARTIALLY_PROTECTED","DISCONNECTED - PARTIALLY PROTECTED"),Stats )
+  | alter Stats = if (Stats contains "STATUS_010_CONNECTED - PARTIALLY_PROTECTED", replace(Stats,"STATUS_010_CONNECTED - PARTIALLY_PROTECTED","CONNECTED - PARTIALLY PROTECTED"),Stats )
+  | alter Stats = if (Stats contains "STATUS_020_LOST - PROTECTED", replace(Stats,"STATUS_020_LOST - PROTECTED","CONNECTION LOST - PROTECTED"),Stats )
+  | alter Stats = if (Stats contains "STATUS_010_CONNECTED - PROTECTED", replace(Stats,"STATUS_010_CONNECTED - PROTECTED","CONNECTED - PROTECTED"),Stats )
+  | alter Stats = if (Stats contains "STATUS_040_DISCONNECTED - PROTECTED", replace(Stats,"STATUS_040_DISCONNECTED - PROTECTED","DISCONNECTED - PROTECTED"),Stats )
+  | alter Stats = if (Stats contains "STATUS_060_VDI_PENDING_LOG_ON - PROTECTED", replace(Stats,"STATUS_060_VDI_PENDING_LOG_ON - PROTECTED","VDI-PENDING-LOG-ON - PROTECTED"),Stats )
+  | alter Stats = if (Stats contains "STATUS_050_UNINSTALLED - PROTECTED", replace(Stats,"STATUS_050_UNINSTALLED - PROTECTED","UNINSTALLED - PROTECTED"),Stats )
+  | view graph type = pie subtype = full show_percentage = `false` xaxis = Stats yaxis = count_1
+

@@ -2,7 +2,7 @@ name: "LSASS Memory Access Detection"
 author: "xql-hub-admin"
 description: "Detects attempts to access LSASS process memory, which is commonly used by credential dumping tools like Mimikatz to extract passwords and hashes from memory."
 severity: "Critical"
-content_type: correlation
+content_type: bioc
 category: "Credential Theft"
 tags:
   - "Credential Dumping"
@@ -12,13 +12,11 @@ mitre_ids:
   - "T1003.001"
   - "T1003"
 log_sources:
-  - "Microsoft Windows"
-  - "Cortex XDR"
-query: |
+  - "Windows Event Logs"
+  - "Cortex XDR Agent"
+query:
   dataset = xdr_data 
   | filter event_type = PROCESS
   | filter action_process_image_name = "lsass.exe"
   | filter causality_actor_process_image_name != "svchost.exe"
   | filter causality_actor_process_image_name != "csrss.exe"
-  | fields _time, agent_hostname, causality_actor_process_image_name, 
-           causality_actor_process_command_line, action_process_image_name
