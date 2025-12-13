@@ -3,27 +3,57 @@
     <div class="card-header">
         <div class="header-top">
             <span class="badge {{ query.content_type }}">{{ query.content_type|upper }}</span>
-            <span class="dataset-badge">📂 {{ query.dataset }}</span>
+            <span class="category-badge">{{ query.category }}</span>
         </div>
         <h2>{{ query.name }}</h2>
     </div>
 
+    {% if query.mitre_ids %}
     <div class="mitre-section">
         {% for mid in query.mitre_ids %}
-        <a href="https://attack.mitre.org/techniques/{{ mid }}" target="_blank" class="mitre-tag">
+        <a href="https://attack.mitre.org/techniques/{{ mid.replace('.', '/') }}" target="_blank" class="mitre-tag">
             🎯 {{ mid }}
         </a>
         {% endfor %}
     </div>
+    {% endif %}
 
     <p class="desc">{{ query.description }}</p>
 
+    {% if query.log_sources %}
+    <div class="log-sources">
+        {% for src in query.log_sources %}
+        <span class="log-source-tag">📋 {{ src }}</span>
+        {% endfor %}
+    </div>
+    {% endif %}
+
     <div class="code-preview">
-        <pre>{{ query.query }}</pre>
+        <button class="copy-btn" onclick="copyCode(this)" title="Copy to clipboard">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+        </button>
+        <pre><code>{{ query.query }}</code></pre>
     </div>
 </div>
 {% endfor %}
 
 {% if not queries %}
-<div class="no-results">No queries match your filter.</div>
+<div class="no-results">
+    <div class="no-results-icon">🔍</div>
+    <h3>No queries found</h3>
+    <p>Try adjusting your filters or search terms</p>
+</div>
 {% endif %}
+
+<script>
+function copyCode(btn) {
+    const code = btn.nextElementSibling.textContent;
+    navigator.clipboard.writeText(code).then(() => {
+        btn.classList.add('copied');
+        setTimeout(() => btn.classList.remove('copied'), 2000);
+    });
+}
+</script>

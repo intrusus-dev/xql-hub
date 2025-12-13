@@ -1,9 +1,9 @@
 import os
 import yaml
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Query
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from typing import List, Optional
 
 app = FastAPI()
@@ -13,16 +13,47 @@ templates = Jinja2Templates(directory="templates")
 QUERY_DB = []
 FILTER_OPTIONS = {
     "mitre_ids": set(),
-    "datasets": set(),
+    "log_sources": set(),
     "types": set(),
     "categories": set()
 }
+
+# MITRE ATT&CK Enterprise Tactics (in kill chain order)
+MITRE_TACTICS = [
+    {"id": "TA0043", "name": "Reconnaissance", "shortname": "recon"},
+    {"id": "TA0042", "name": "Resource Development", "shortname": "resource-dev"},
+    {"id": "TA0001", "name": "Initial Access", "shortname": "initial-access"},
+    {"id": "TA0002", "name": "Execution", "shortname": "execution"},
+    {"id": "TA0003", "name": "Persistence", "shortname": "persistence"},
+    {"id": "TA0004", "name": "Privilege Escalation", "shortname": "priv-esc"},
+    {"id": "TA0005", "name": "Defense Evasion", "shortname": "defense-evasion"},
+    {"id": "TA0006", "name": "Credential Access", "shortname": "cred-access"},
+    {"id": "TA0007", "name": "Discovery", "shortname": "discovery"},
+    {"id": "TA0008", "name": "Lateral Movement", "shortname": "lateral"},
+    {"id": "TA0009", "name": "Collection", "shortname": "collection"},
+    {"id": "TA0011", "name": "Command and Control", "shortname": "c2"},
+    {"id": "TA0010", "name": "Exfiltration", "shortname": "exfil"},
+    {"id": "TA0040", "name": "Impact", "shortname": "impact"},
+]
+
+
+def get_tactic_for_technique(technique_id: str) -> str:
+    """Map technique IDs to tactics based on known mappings."""
+    # This is a simplified mapping - in production you'd want a complete mapping
+    # or fetch from MITRE ATT&CK STIX data
+    tactic_map = {
+        # Privilege Escalation & Persistence
+        "T1098": "TA0003",  # Account Manipulation -> Persistence
+        "T1078": "TA0001",  # Valid Accounts -> Initial Access
+        # Add more mappings as needed
+    }
+    base_id = technique_id.split('.')[0]
+    return tactic_map.get(base_id, "")
 
 
 def load_queries():
     global QUERY_DB, FILTER_OPTIONS
     QUERY_DB = []
-    # Reset filters
     FILTER_OPTIONS = {k: set() for k in FILTER_OPTIONS}
 
     if os.path.exists("queries"):
@@ -31,18 +62,27 @@ def load_queries():
                 with open(f"queries/{filename}", "r") as f:
                     try:
                         data = yaml.safe_load(f)
-                        data['id'] = filename  # track filename
+                        data['id'] = filename
 
                         # Data Normalization
-                        if 'content_type' not in data: data['content_type'] = 'xql'
-                        if 'mitre_ids' not in data: data['mitre_ids'] = []
-                        if 'dataset' not in data: data['dataset'] = 'unknown'
+                        if 'content_type' not in data:
+                            data['content_type'] = 'xql'
+                        if 'mitre_ids' not in data:
+                            data['mitre_ids'] = []
+                        if 'log_sources' not in data:
+                            data['log_sources'] = []
+                        if 'category' not in data:
+                            data['category'] = 'Uncategorized'
 
                         # Populate Filter Lists
                         FILTER_OPTIONS["types"].add(data['content_type'])
-                        FILTER_OPTIONS["datasets"].add(data['dataset'])
-                        if 'category' in data: FILTER_OPTIONS["categories"].add(data['category'])
-                        for mid in data['mitre_ids']: FILTER_OPTIONS["mitre_ids"].add(mid)
+                        FILTER_OPTIONS["categories"].add(data['category'])
+
+                        for mid in data['mitre_ids']:
+                            FILTER_OPTIONS["mitre_ids"].add(mid)
+
+                        for src in data['log_sources']:
+                            FILTER_OPTIONS["log_sources"].add(src)
 
                         QUERY_DB.append(data)
                     except Exception as e:
@@ -52,13 +92,34 @@ def load_queries():
 load_queries()
 
 
+def organize_mitre_by_tactic():
+    """Organize available MITRE IDs by tactic for the matrix view."""
+    # Group techniques by their base ID and collect all from queries
+    techniques_in_use = {}
+    for query in QUERY_DB:
+        for mid in query.get('mitre_ids', []):
+            base_id = mid.split('.')[0]  # T1098.007 -> T1098
+            if base_id not in techniques_in_use:
+                techniques_in_use[base_id] = {
+                    'id': base_id,
+                    'subtechniques': set()
+                }
+            if '.' in mid:
+                techniques_in_use[base_id]['subtechniques'].add(mid)
+
+    return techniques_in_use
+
+
 @app.get("/", response_class=HTMLResponse)
 async def homepage(request: Request):
-    # Pass the available filter options to the frontend
+    techniques_in_use = organize_mitre_by_tactic()
+
     return templates.TemplateResponse("index.html", {
         "request": request,
         "queries": QUERY_DB,
-        "filters": {k: sorted(list(v)) for k, v in FILTER_OPTIONS.items()}
+        "filters": {k: sorted(list(v)) for k, v in FILTER_OPTIONS.items()},
+        "tactics": MITRE_TACTICS,
+        "techniques_in_use": techniques_in_use
     })
 
 
@@ -67,34 +128,63 @@ async def search(
         request: Request,
         q: str = "",
         content_type: str = "",
-        mitre: str = "",
-        dataset: str = ""
+        mitre: List[str] = Query(default=[]),
+        category: str = "",
+        log_source: str = ""
 ):
     filtered = QUERY_DB
-    q = q.lower()
+    q_lower = q.lower()
 
     # 1. Text Search
-    if q:
-        filtered = [x for x in filtered if q in str(x).lower()]
+    if q_lower:
+        filtered = [x for x in filtered if q_lower in str(x).lower()]
 
-    # 2. Filter by Content Type (XQL, Correlation, BIOC)
+    # 2. Filter by Content Type
     if content_type and content_type != "all":
         filtered = [x for x in filtered if x['content_type'] == content_type]
 
-    # 3. Filter by MITRE
-    if mitre and mitre != "all":
-        filtered = [x for x in filtered if mitre in x['mitre_ids']]
+    # 3. Filter by MITRE (multi-select - match ANY selected)
+    if mitre and len(mitre) > 0:
+        # Filter out empty strings
+        mitre = [m for m in mitre if m and m != "all"]
+        if mitre:
+            def matches_mitre(query_item):
+                query_mitre = query_item.get('mitre_ids', [])
+                for selected in mitre:
+                    # Check exact match or if it's a parent technique
+                    for qm in query_mitre:
+                        if qm == selected or qm.startswith(selected + '.'):
+                            return True
+                return False
 
-    # 4. Filter by Dataset
-    if dataset and dataset != "all":
-        filtered = [x for x in filtered if x['dataset'] == dataset]
+            filtered = [x for x in filtered if matches_mitre(x)]
+
+    # 4. Filter by Category
+    if category and category != "all":
+        filtered = [x for x in filtered if x.get('category') == category]
+
+    # 5. Filter by Log Source
+    if log_source and log_source != "all":
+        filtered = [x for x in filtered if log_source in x.get('log_sources', [])]
 
     return templates.TemplateResponse("partials/query_cards.html", {
         "request": request,
         "queries": filtered
     })
 
-# This allows you to run the app by pressing Play in PyCharm
+
+@app.get("/api/filters", response_class=JSONResponse)
+async def get_filters():
+    """API endpoint to get all available filter options."""
+    return {
+        "types": sorted(list(FILTER_OPTIONS["types"])),
+        "categories": sorted(list(FILTER_OPTIONS["categories"])),
+        "log_sources": sorted(list(FILTER_OPTIONS["log_sources"])),
+        "mitre_ids": sorted(list(FILTER_OPTIONS["mitre_ids"])),
+        "tactics": MITRE_TACTICS
+    }
+
+
 if __name__ == "__main__":
     import uvicorn
 

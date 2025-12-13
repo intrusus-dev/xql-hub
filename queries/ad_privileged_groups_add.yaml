@@ -1,5 +1,5 @@
 name: "User added to high privileged AD group"
-author: "xql-hub-admin"  # You can change this to your handle
+author: "xql-hub-admin"
 description: "Detection of a successful addition of a member to one of the highly privileged Active Directory security groups. This activity could signify an attempt to escalate privileges or compromise an account within the domain."
 severity: "High"
 content_type: correlation
@@ -15,7 +15,7 @@ mitre_ids:
   - "T1078.002"
 log_sources:
   - "Microsoft Windows"
-query:
+query: |
   dataset = microsoft_windows_raw 
   | filter event_id in (4728, 4732, 4756)
   | filter event_result = "success"

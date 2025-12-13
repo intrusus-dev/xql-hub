@@ -1,0 +1,23 @@
+name: "Suspicious PowerShell Execution"
+author: "xql-hub-admin"
+description: "Detects potentially malicious PowerShell command execution patterns including encoded commands, download cradles, and execution policy bypasses commonly used by attackers."
+severity: "High"
+content_type: xql
+category: "Endpoint Security"
+tags:
+  - "PowerShell"
+  - "Execution"
+  - "Living Off The Land"
+mitre_ids:
+  - "T1059.001"
+  - "T1059"
+log_sources:
+  - "Microsoft Windows"
+  - "Cortex XDR"
+query: |
+  dataset = xdr_data 
+  | filter event_type = PROCESS
+  | filter action_process_image_name ~= "powershell"
+  | filter action_process_command_line ~= "encodedcommand|bypass|downloadstring|invoke-expression|iex|webclient"
+  | fields _time, agent_hostname, action_process_image_name, 
+           action_process_command_line, actor_process_image_name

@@ -2,30 +2,33 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>XSIAM Hub</title>
     <link rel="stylesheet" href="/static/style.css">
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Fira+Code&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 </head>
 <body>
 
     <header>
         <div class="logo">XSIAM <span>HUB</span></div>
         <div class="search-bar">
-            <input type="text" name="q"
-                   placeholder="Search..."
+            <input type="text" name="q" id="search-input"
+                   placeholder="Search queries..."
                    hx-get="/search"
                    hx-target="#results-grid"
                    hx-trigger="keyup changed delay:300ms"
-                   hx-include=".filter-select"> </div>
+                   hx-include=".filter-input">
+        </div>
     </header>
 
     <div class="layout">
         <aside class="sidebar">
+            <!-- Content Type Filter -->
             <div class="filter-group">
                 <label>Content Type</label>
-                <select name="content_type" class="filter-select"
-                        hx-get="/search" hx-target="#results-grid" hx-include="[name='q'], .filter-select">
+                <select name="content_type" class="filter-input filter-select"
+                        hx-get="/search" hx-target="#results-grid" hx-include=".filter-input">
                     <option value="all">All Types</option>
                     {% for t in filters.types %}
                     <option value="{{ t }}">{{ t|upper }}</option>
@@ -33,26 +36,56 @@
                 </select>
             </div>
 
+            <!-- Category Filter -->
             <div class="filter-group">
-                <label>Dataset</label>
-                <select name="dataset" class="filter-select"
-                        hx-get="/search" hx-target="#results-grid" hx-include="[name='q'], .filter-select">
-                    <option value="all">All Datasets</option>
-                    {% for d in filters.datasets %}
-                    <option value="{{ d }}">{{ d }}</option>
+                <label>Category</label>
+                <select name="category" class="filter-input filter-select"
+                        hx-get="/search" hx-target="#results-grid" hx-include=".filter-input">
+                    <option value="all">All Categories</option>
+                    {% for c in filters.categories %}
+                    <option value="{{ c }}">{{ c }}</option>
                     {% endfor %}
                 </select>
             </div>
 
+            <!-- Log Source Filter -->
             <div class="filter-group">
-                <label>MITRE TTP</label>
-                <select name="mitre" class="filter-select"
-                        hx-get="/search" hx-target="#results-grid" hx-include="[name='q'], .filter-select">
-                    <option value="all">All TTPs</option>
-                    {% for m in filters.mitre_ids %}
-                    <option value="{{ m }}">{{ m }}</option>
+                <label>Log Source</label>
+                <select name="log_source" class="filter-input filter-select"
+                        hx-get="/search" hx-target="#results-grid" hx-include=".filter-input">
+                    <option value="all">All Log Sources</option>
+                    {% for ls in filters.log_sources %}
+                    <option value="{{ ls }}">{{ ls }}</option>
                     {% endfor %}
                 </select>
+            </div>
+
+            <!-- MITRE ATT&CK Matrix -->
+            <div class="filter-group mitre-matrix-section">
+                <div class="mitre-header">
+                    <label>MITRE ATT&CK</label>
+                    <button type="button" class="clear-mitre-btn" onclick="clearMitreSelection()">Clear</button>
+                </div>
+
+                <div class="mitre-matrix" id="mitre-matrix">
+                    {% for tactic in tactics %}
+                    <div class="tactic-group" data-tactic="{{ tactic.id }}">
+                        <div class="tactic-header" onclick="toggleTactic('{{ tactic.id }}')">
+                            <span class="tactic-toggle">▶</span>
+                            <span class="tactic-name">{{ tactic.name }}</span>
+                            <span class="tactic-count" id="count-{{ tactic.id }}">0</span>
+                        </div>
+                        <div class="tactic-techniques" id="techniques-{{ tactic.id }}">
+                            <!-- Techniques will be populated by JS based on available data -->
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <div class="selected-mitre" id="selected-mitre-display">
+                    <span class="selected-label">Selected:</span>
+                    <div class="selected-tags" id="selected-tags"></div>
+                </div>
             </div>
         </aside>
 
@@ -60,6 +93,180 @@
             {% include "partials/query_cards.html" %}
         </main>
     </div>
+
+    <script>
+        // MITRE techniques available in the database (from server)
+        const availableMitre = {{ filters.mitre_ids | tojson | safe }};
+
+        // Technique to Tactic mapping (simplified - expand as needed)
+        const techniqueToTactic = {
+            'T1098': 'TA0003', // Account Manipulation -> Persistence
+            'T1078': 'TA0001', // Valid Accounts -> Initial Access
+            'T1059': 'TA0002', // Command and Scripting Interpreter -> Execution
+            'T1547': 'TA0003', // Boot or Logon Autostart Execution -> Persistence
+            'T1548': 'TA0004', // Abuse Elevation Control Mechanism -> Privilege Escalation
+            'T1134': 'TA0004', // Access Token Manipulation -> Privilege Escalation
+            'T1087': 'TA0007', // Account Discovery -> Discovery
+            'T1110': 'TA0006', // Brute Force -> Credential Access
+            'T1003': 'TA0006', // OS Credential Dumping -> Credential Access
+            'T1021': 'TA0008', // Remote Services -> Lateral Movement
+            'T1071': 'TA0011', // Application Layer Protocol -> C2
+            'T1048': 'TA0010', // Exfiltration Over Alternative Protocol -> Exfil
+            'T1486': 'TA0040', // Data Encrypted for Impact -> Impact
+            'T1595': 'TA0043', // Active Scanning -> Reconnaissance
+            'T1583': 'TA0042', // Acquire Infrastructure -> Resource Development
+            'T1566': 'TA0001', // Phishing -> Initial Access
+            'T1053': 'TA0002', // Scheduled Task/Job -> Execution
+            'T1136': 'TA0003', // Create Account -> Persistence
+            'T1027': 'TA0005', // Obfuscated Files or Information -> Defense Evasion
+            'T1560': 'TA0009', // Archive Collected Data -> Collection
+        };
+
+        // Selected MITRE techniques
+        let selectedMitre = new Set();
+
+        // Initialize the MITRE matrix
+        function initMitreMatrix() {
+            const tacticCounts = {};
+
+            // Group techniques by tactic
+            availableMitre.forEach(mid => {
+                const baseId = mid.split('.')[0];
+                const tacticId = techniqueToTactic[baseId];
+
+                if (tacticId) {
+                    if (!tacticCounts[tacticId]) {
+                        tacticCounts[tacticId] = new Set();
+                    }
+                    tacticCounts[tacticId].add(mid);
+                }
+            });
+
+            // Populate each tactic's techniques
+            Object.entries(tacticCounts).forEach(([tacticId, techniques]) => {
+                const container = document.getElementById(`techniques-${tacticId}`);
+                const countEl = document.getElementById(`count-${tacticId}`);
+
+                if (container && countEl) {
+                    countEl.textContent = techniques.size;
+
+                    // Group by base technique
+                    const grouped = {};
+                    techniques.forEach(mid => {
+                        const base = mid.split('.')[0];
+                        if (!grouped[base]) grouped[base] = [];
+                        grouped[base].push(mid);
+                    });
+
+                    container.innerHTML = '';
+                    Object.entries(grouped).sort().forEach(([base, subs]) => {
+                        subs.sort().forEach(mid => {
+                            const chip = document.createElement('button');
+                            chip.type = 'button';
+                            chip.className = 'technique-chip';
+                            chip.dataset.mid = mid;
+                            chip.textContent = mid;
+                            chip.onclick = () => toggleTechnique(mid);
+                            container.appendChild(chip);
+                        });
+                    });
+                }
+            });
+        }
+
+        function toggleTactic(tacticId) {
+            const group = document.querySelector(`[data-tactic="${tacticId}"]`);
+            const techniques = document.getElementById(`techniques-${tacticId}`);
+            const toggle = group.querySelector('.tactic-toggle');
+
+            if (group.classList.contains('expanded')) {
+                group.classList.remove('expanded');
+                techniques.style.display = 'none';
+                toggle.textContent = '▶';
+            } else {
+                group.classList.add('expanded');
+                techniques.style.display = 'flex';
+                toggle.textContent = '▼';
+            }
+        }
+
+        function toggleTechnique(mid) {
+            const chip = document.querySelector(`[data-mid="${mid}"]`);
+
+            if (selectedMitre.has(mid)) {
+                selectedMitre.delete(mid);
+                chip?.classList.remove('selected');
+            } else {
+                selectedMitre.add(mid);
+                chip?.classList.add('selected');
+            }
+
+            updateSelectedDisplay();
+            triggerSearch();
+        }
+
+        function updateSelectedDisplay() {
+            const display = document.getElementById('selected-mitre-display');
+            const tagsContainer = document.getElementById('selected-tags');
+
+            if (selectedMitre.size === 0) {
+                display.classList.remove('has-selection');
+                tagsContainer.innerHTML = '<span class="no-selection">None</span>';
+            } else {
+                display.classList.add('has-selection');
+                tagsContainer.innerHTML = Array.from(selectedMitre).map(mid =>
+                    `<span class="selected-tag" onclick="toggleTechnique('${mid}')">${mid} ×</span>`
+                ).join('');
+            }
+        }
+
+        function clearMitreSelection() {
+            selectedMitre.clear();
+            document.querySelectorAll('.technique-chip.selected').forEach(el => {
+                el.classList.remove('selected');
+            });
+            updateSelectedDisplay();
+            triggerSearch();
+        }
+
+        function triggerSearch() {
+            // Build the URL with all filter params
+            const params = new URLSearchParams();
+
+            const q = document.getElementById('search-input')?.value || '';
+            if (q) params.append('q', q);
+
+            const contentType = document.querySelector('select[name="content_type"]')?.value || 'all';
+            if (contentType !== 'all') params.append('content_type', contentType);
+
+            const category = document.querySelector('select[name="category"]')?.value || 'all';
+            if (category !== 'all') params.append('category', category);
+
+            const logSource = document.querySelector('select[name="log_source"]')?.value || 'all';
+            if (logSource !== 'all') params.append('log_source', logSource);
+
+            selectedMitre.forEach(mid => params.append('mitre', mid));
+
+            htmx.ajax('GET', `/search?${params.toString()}`, '#results-grid');
+        }
+
+        // Override HTMX to include MITRE selection
+        document.body.addEventListener('htmx:configRequest', function(evt) {
+            if (selectedMitre.size > 0) {
+                selectedMitre.forEach(mid => {
+                    evt.detail.parameters['mitre'] = evt.detail.parameters['mitre'] || [];
+                    if (Array.isArray(evt.detail.parameters['mitre'])) {
+                        evt.detail.parameters['mitre'].push(mid);
+                    } else {
+                        evt.detail.parameters['mitre'] = [evt.detail.parameters['mitre'], mid];
+                    }
+                });
+            }
+        });
+
+        // Initialize on load
+        document.addEventListener('DOMContentLoaded', initMitreMatrix);
+    </script>
 
 </body>
 </html>
