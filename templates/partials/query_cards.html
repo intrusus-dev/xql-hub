@@ -2,7 +2,17 @@
 <div class="card type-{{ query.content_type }}">
     <div class="card-header">
         <div class="header-top">
+            {% if query.content_type == 'hunting' %}
+            <span class="badge hunting">THREAT HUNTING</span>
+            {% elif query.content_type == 'hygiene' %}
+            <span class="badge hygiene">IT HYGIENE</span>
+            {% elif query.content_type == 'bioc' %}
+            <span class="badge bioc">BIOC</span>
+            {% elif query.content_type == 'correlation' %}
+            <span class="badge correlation">CORRELATION</span>
+            {% else %}
             <span class="badge {{ query.content_type }}">{{ query.content_type|upper }}</span>
+            {% endif %}
             <span class="category-badge">{{ query.category }}</span>
         </div>
         <h2>{{ query.name }}</h2>

@@ -6,128 +6,214 @@
     <title>XSIAM Hub</title>
     <link rel="stylesheet" href="/static/style.css">
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 </head>
 <body>
 
     <header>
         <div class="logo">XSIAM <span>HUB</span></div>
-        <div class="search-bar">
-            <input type="text" name="q" id="search-input"
-                   placeholder="Search queries..."
-                   hx-get="/search"
-                   hx-target="#results-grid"
-                   hx-trigger="keyup changed delay:300ms"
-                   hx-include=".filter-input">
+        <div class="header-controls">
+            <div class="search-bar">
+                <input type="text" name="q" id="search-input"
+                       placeholder="Search queries..."
+                       oninput="onFilterChange()">
+            </div>
         </div>
     </header>
 
-    <div class="layout">
-        <aside class="sidebar">
-            <!-- Content Type Filter -->
-            <div class="filter-group">
-                <label>Content Type</label>
-                <select name="content_type" class="filter-input filter-select"
-                        hx-get="/search" hx-target="#results-grid" hx-include=".filter-input">
-                    <option value="all">All Types</option>
-                    {% for t in filters.types %}
-                    <option value="{{ t }}">{{ t|upper }}</option>
-                    {% endfor %}
-                </select>
-            </div>
+    <!-- Filter Bar -->
+    <div class="filter-bar">
+        <div class="filter-group">
+            <label>Content Type</label>
+            <select name="content_type" id="filter-content-type" class="filter-select" onchange="onFilterChange()">
+                <option value="all">All Types</option>
+                {% for t in filters.types %}
+                <option value="{{ t }}">{{ t|upper if t == 'bioc' else 'Threat Hunting' if t == 'hunting' else 'IT Hygiene' if t == 'hygiene' else t|title }}</option>
+                {% endfor %}
+            </select>
+        </div>
 
-            <!-- Category Filter -->
-            <div class="filter-group">
-                <label>Category</label>
-                <select name="category" class="filter-input filter-select"
-                        hx-get="/search" hx-target="#results-grid" hx-include=".filter-input">
-                    <option value="all">All Categories</option>
-                    {% for c in filters.categories %}
-                    <option value="{{ c }}">{{ c }}</option>
-                    {% endfor %}
-                </select>
-            </div>
+        <div class="filter-group">
+            <label>Category</label>
+            <select name="category" id="filter-category" class="filter-select" onchange="onFilterChange()">
+                <option value="all">All Categories</option>
+                {% for c in filters.categories %}
+                <option value="{{ c }}">{{ c }}</option>
+                {% endfor %}
+            </select>
+        </div>
 
-            <!-- Log Source Filter -->
-            <div class="filter-group">
-                <label>Log Source</label>
-                <select name="log_source" class="filter-input filter-select"
-                        hx-get="/search" hx-target="#results-grid" hx-include=".filter-input">
-                    <option value="all">All Log Sources</option>
-                    {% for ls in filters.log_sources %}
-                    <option value="{{ ls }}">{{ ls }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-
-            <!-- MITRE ATT&CK Matrix -->
-            <div class="filter-group mitre-matrix-section">
-                <div class="mitre-header">
-                    <label>MITRE ATT&CK</label>
-                    <button type="button" class="clear-mitre-btn" onclick="clearMitreSelection()">Clear</button>
-                </div>
-
-                <div class="mitre-matrix" id="mitre-matrix">
-                    {% for tactic in tactics %}
-                    <div class="tactic-group" data-tactic="{{ tactic.id }}">
-                        <div class="tactic-header" onclick="toggleTactic('{{ tactic.id }}')">
-                            <span class="tactic-toggle">▶</span>
-                            <span class="tactic-name">{{ tactic.name }}</span>
-                            <span class="tactic-count" id="count-{{ tactic.id }}">0</span>
-                        </div>
-                        <div class="tactic-techniques" id="techniques-{{ tactic.id }}">
-                            <!-- Techniques will be populated by JS based on available data -->
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-
-                <div class="selected-mitre" id="selected-mitre-display">
-                    <span class="selected-label">Selected:</span>
-                    <div class="selected-tags" id="selected-tags"></div>
-                </div>
-            </div>
-        </aside>
-
-        <main id="results-grid" class="grid">
-            {% include "partials/query_cards.html" %}
-        </main>
+        <div class="filter-group">
+            <label>Log Source</label>
+            <select name="log_source" id="filter-log-source" class="filter-select" onchange="onFilterChange()">
+                <option value="all">All Log Sources</option>
+                {% for ls in filters.log_sources %}
+                <option value="{{ ls }}">{{ ls }}</option>
+                {% endfor %}
+            </select>
+        </div>
     </div>
 
-    <script>
-        // MITRE techniques available in the database (from server)
-        const availableMitre = {{ filters.mitre_ids | tojson | safe }};
+    <!-- MITRE ATT&CK Matrix -->
+    <div class="mitre-matrix-container">
+        <div class="mitre-matrix-header">
+            <h3>MITRE ATT&CK Matrix</h3>
+            <div class="mitre-stats">
+                <span id="tactic-count">0</span> Tactics and <span id="technique-count">0</span> Techniques covered
+            </div>
+            <button type="button" class="clear-mitre-btn" onclick="clearAllFilters()">Clear All Filters</button>
+        </div>
 
-        // Technique to Tactic mapping (simplified - expand as needed)
+        <div class="tactics-row" id="tactics-row">
+            <!-- Tactics will be populated by JS -->
+        </div>
+
+        <div class="selected-techniques" id="selected-display">
+            <span class="selected-label">Active Filters:</span>
+            <div class="selected-tags" id="selected-tags"></div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div id="results-grid" class="grid">
+            {% include "partials/query_cards.html" %}
+        </div>
+    </main>
+
+    <script>
+        // All queries from the database (for dynamic filtering)
+        const allQueries = {{ queries | tojson | safe }};
+
+        // Complete technique name mapping
+        const techniqueNames = {
+            'T1098': 'Account Manipulation',
+            'T1098.001': 'Additional Cloud Credentials',
+            'T1098.002': 'Additional Email Delegate Permissions',
+            'T1098.003': 'Additional Cloud Roles',
+            'T1098.004': 'SSH Authorized Keys',
+            'T1098.005': 'Device Registration',
+            'T1098.006': 'Additional Container Cluster Roles',
+            'T1098.007': 'Additional Local or Domain Groups',
+            'T1078': 'Valid Accounts',
+            'T1078.001': 'Default Accounts',
+            'T1078.002': 'Domain Accounts',
+            'T1078.003': 'Local Accounts',
+            'T1078.004': 'Cloud Accounts',
+            'T1059': 'Command and Scripting Interpreter',
+            'T1059.001': 'PowerShell',
+            'T1059.002': 'AppleScript',
+            'T1059.003': 'Windows Command Shell',
+            'T1059.004': 'Unix Shell',
+            'T1059.005': 'Visual Basic',
+            'T1059.006': 'Python',
+            'T1003': 'OS Credential Dumping',
+            'T1003.001': 'LSASS Memory',
+            'T1003.002': 'Security Account Manager',
+            'T1003.003': 'NTDS',
+            'T1003.004': 'LSA Secrets',
+            'T1003.005': 'Cached Domain Credentials',
+            'T1003.006': 'DCSync',
+            'T1021': 'Remote Services',
+            'T1021.001': 'Remote Desktop Protocol',
+            'T1021.002': 'SMB/Windows Admin Shares',
+            'T1021.003': 'Distributed Component Object Model',
+            'T1021.004': 'SSH',
+            'T1021.005': 'VNC',
+            'T1021.006': 'Windows Remote Management',
+            'T1547': 'Boot or Logon Autostart Execution',
+            'T1548': 'Abuse Elevation Control Mechanism',
+            'T1134': 'Access Token Manipulation',
+            'T1087': 'Account Discovery',
+            'T1110': 'Brute Force',
+            'T1071': 'Application Layer Protocol',
+            'T1048': 'Exfiltration Over Alternative Protocol',
+            'T1486': 'Data Encrypted for Impact',
+            'T1595': 'Active Scanning',
+            'T1583': 'Acquire Infrastructure',
+            'T1566': 'Phishing',
+            'T1053': 'Scheduled Task/Job',
+            'T1136': 'Create Account',
+            'T1027': 'Obfuscated Files or Information',
+            'T1560': 'Archive Collected Data',
+        };
+
+        // Tactic definitions with full names
+        const tactics = [
+            { id: 'TA0043', name: 'Reconnaissance', shortname: 'Reconnaissance' },
+            { id: 'TA0042', name: 'Resource Development', shortname: 'Resource Dev' },
+            { id: 'TA0001', name: 'Initial Access', shortname: 'Initial Access' },
+            { id: 'TA0002', name: 'Execution', shortname: 'Execution' },
+            { id: 'TA0003', name: 'Persistence', shortname: 'Persistence' },
+            { id: 'TA0004', name: 'Privilege Escalation', shortname: 'Priv Escalation' },
+            { id: 'TA0005', name: 'Defense Evasion', shortname: 'Defense Evasion' },
+            { id: 'TA0006', name: 'Credential Access', shortname: 'Cred Access' },
+            { id: 'TA0007', name: 'Discovery', shortname: 'Discovery' },
+            { id: 'TA0008', name: 'Lateral Movement', shortname: 'Lateral Move' },
+            { id: 'TA0009', name: 'Collection', shortname: 'Collection' },
+            { id: 'TA0011', name: 'Command and Control', shortname: 'C2' },
+            { id: 'TA0010', name: 'Exfiltration', shortname: 'Exfiltration' },
+            { id: 'TA0040', name: 'Impact', shortname: 'Impact' },
+        ];
+
+        // Technique to Tactic mapping
         const techniqueToTactic = {
-            'T1098': 'TA0003', // Account Manipulation -> Persistence
-            'T1078': 'TA0001', // Valid Accounts -> Initial Access
-            'T1059': 'TA0002', // Command and Scripting Interpreter -> Execution
-            'T1547': 'TA0003', // Boot or Logon Autostart Execution -> Persistence
-            'T1548': 'TA0004', // Abuse Elevation Control Mechanism -> Privilege Escalation
-            'T1134': 'TA0004', // Access Token Manipulation -> Privilege Escalation
-            'T1087': 'TA0007', // Account Discovery -> Discovery
-            'T1110': 'TA0006', // Brute Force -> Credential Access
-            'T1003': 'TA0006', // OS Credential Dumping -> Credential Access
-            'T1021': 'TA0008', // Remote Services -> Lateral Movement
-            'T1071': 'TA0011', // Application Layer Protocol -> C2
-            'T1048': 'TA0010', // Exfiltration Over Alternative Protocol -> Exfil
-            'T1486': 'TA0040', // Data Encrypted for Impact -> Impact
-            'T1595': 'TA0043', // Active Scanning -> Reconnaissance
-            'T1583': 'TA0042', // Acquire Infrastructure -> Resource Development
-            'T1566': 'TA0001', // Phishing -> Initial Access
-            'T1053': 'TA0002', // Scheduled Task/Job -> Execution
-            'T1136': 'TA0003', // Create Account -> Persistence
-            'T1027': 'TA0005', // Obfuscated Files or Information -> Defense Evasion
-            'T1560': 'TA0009', // Archive Collected Data -> Collection
+            'T1595': 'TA0043', 'T1592': 'TA0043', 'T1589': 'TA0043', 'T1590': 'TA0043', 'T1591': 'TA0043',
+            'T1583': 'TA0042', 'T1586': 'TA0042', 'T1584': 'TA0042', 'T1587': 'TA0042', 'T1585': 'TA0042', 'T1588': 'TA0042',
+            'T1566': 'TA0001', 'T1078': 'TA0001', 'T1190': 'TA0001', 'T1133': 'TA0001', 'T1200': 'TA0001',
+            'T1059': 'TA0002', 'T1053': 'TA0002', 'T1047': 'TA0002', 'T1569': 'TA0002', 'T1204': 'TA0002',
+            'T1098': 'TA0003', 'T1547': 'TA0003', 'T1037': 'TA0003', 'T1136': 'TA0003', 'T1543': 'TA0003', 'T1546': 'TA0003',
+            'T1548': 'TA0004', 'T1134': 'TA0004', 'T1068': 'TA0004', 'T1055': 'TA0004',
+            'T1027': 'TA0005', 'T1070': 'TA0005', 'T1036': 'TA0005', 'T1218': 'TA0005', 'T1562': 'TA0005',
+            'T1003': 'TA0006', 'T1110': 'TA0006', 'T1555': 'TA0006', 'T1552': 'TA0006', 'T1558': 'TA0006',
+            'T1087': 'TA0007', 'T1082': 'TA0007', 'T1083': 'TA0007', 'T1057': 'TA0007', 'T1018': 'TA0007',
+            'T1021': 'TA0008', 'T1570': 'TA0008', 'T1534': 'TA0008', 'T1080': 'TA0008',
+            'T1560': 'TA0009', 'T1115': 'TA0009', 'T1005': 'TA0009', 'T1114': 'TA0009',
+            'T1071': 'TA0011', 'T1105': 'TA0011', 'T1571': 'TA0011', 'T1572': 'TA0011', 'T1090': 'TA0011',
+            'T1048': 'TA0010', 'T1041': 'TA0010', 'T1567': 'TA0010',
+            'T1486': 'TA0040', 'T1485': 'TA0040', 'T1489': 'TA0040', 'T1490': 'TA0040',
         };
 
         // Selected MITRE techniques
         let selectedMitre = new Set();
+        let expandedTactics = new Set();
 
-        // Initialize the MITRE matrix
-        function initMitreMatrix() {
+        // Get currently filtered queries based on dropdown selections
+        function getFilteredQueries() {
+            const contentType = document.getElementById('filter-content-type')?.value || 'all';
+            const category = document.getElementById('filter-category')?.value || 'all';
+            const logSource = document.getElementById('filter-log-source')?.value || 'all';
+            const searchQuery = document.getElementById('search-input')?.value?.toLowerCase() || '';
+
+            return allQueries.filter(q => {
+                if (contentType !== 'all' && q.content_type !== contentType) return false;
+                if (category !== 'all' && q.category !== category) return false;
+                if (logSource !== 'all' && !(q.log_sources || []).includes(logSource)) return false;
+                if (searchQuery && !JSON.stringify(q).toLowerCase().includes(searchQuery)) return false;
+                return true;
+            });
+        }
+
+        // Get MITRE IDs from filtered queries
+        function getMitreFromFilteredQueries() {
+            const filtered = getFilteredQueries();
+            const mitreIds = new Set();
+            filtered.forEach(q => {
+                (q.mitre_ids || []).forEach(mid => mitreIds.add(mid));
+            });
+            return Array.from(mitreIds);
+        }
+
+        // Build/rebuild the MITRE matrix based on current filters
+        function buildMitreMatrix() {
+            const availableMitre = getMitreFromFilteredQueries();
             const tacticCounts = {};
+            const tacticTechniques = {};
+
+            // Initialize all tactics
+            tactics.forEach(t => {
+                tacticCounts[t.id] = 0;
+                tacticTechniques[t.id] = new Map();
+            });
 
             // Group techniques by tactic
             availableMitre.forEach(mid => {
@@ -135,70 +221,117 @@
                 const tacticId = techniqueToTactic[baseId];
 
                 if (tacticId) {
-                    if (!tacticCounts[tacticId]) {
-                        tacticCounts[tacticId] = new Set();
+                    if (!tacticTechniques[tacticId].has(baseId)) {
+                        tacticTechniques[tacticId].set(baseId, []);
                     }
-                    tacticCounts[tacticId].add(mid);
+                    tacticTechniques[tacticId].get(baseId).push(mid);
                 }
             });
 
-            // Populate each tactic's techniques
-            Object.entries(tacticCounts).forEach(([tacticId, techniques]) => {
-                const container = document.getElementById(`techniques-${tacticId}`);
-                const countEl = document.getElementById(`count-${tacticId}`);
-
-                if (container && countEl) {
-                    countEl.textContent = techniques.size;
-
-                    // Group by base technique
-                    const grouped = {};
-                    techniques.forEach(mid => {
-                        const base = mid.split('.')[0];
-                        if (!grouped[base]) grouped[base] = [];
-                        grouped[base].push(mid);
-                    });
-
-                    container.innerHTML = '';
-                    Object.entries(grouped).sort().forEach(([base, subs]) => {
-                        subs.sort().forEach(mid => {
-                            const chip = document.createElement('button');
-                            chip.type = 'button';
-                            chip.className = 'technique-chip';
-                            chip.dataset.mid = mid;
-                            chip.textContent = mid;
-                            chip.onclick = () => toggleTechnique(mid);
-                            container.appendChild(chip);
-                        });
-                    });
-                }
+            // Count unique techniques per tactic
+            Object.keys(tacticTechniques).forEach(tacticId => {
+                tacticCounts[tacticId] = tacticTechniques[tacticId].size;
             });
+
+            // Build the UI
+            const tacticsRow = document.getElementById('tactics-row');
+            tacticsRow.innerHTML = '';
+
+            let totalTactics = 0;
+            let totalTechniques = 0;
+
+            tactics.forEach(tactic => {
+                const count = tacticCounts[tactic.id];
+                const techniques = tacticTechniques[tactic.id];
+
+                if (count > 0) totalTactics++;
+                totalTechniques += count;
+
+                const column = document.createElement('div');
+                column.className = 'tactic-column';
+                column.dataset.tacticId = tactic.id;
+
+                const hasQueries = count > 0;
+                const isExpanded = expandedTactics.has(tactic.id);
+
+                column.innerHTML = `
+                    <div class="tactic-header ${hasQueries ? 'has-queries' : ''} ${isExpanded ? 'expanded' : ''}" onclick="toggleTactic('${tactic.id}')">
+                        <span class="tactic-count ${hasQueries ? 'has-queries' : 'zero'}">${count}</span>
+                        <span class="tactic-name">${tactic.shortname}</span>
+                        <span class="tactic-id">${tactic.id}</span>
+                        ${hasQueries ? '<span class="tactic-expand-indicator">▼</span>' : ''}
+                    </div>
+                    <div class="techniques-panel ${isExpanded ? 'expanded' : ''}" id="panel-${tactic.id}">
+                        ${buildTechniquesPanel(techniques)}
+                    </div>
+                `;
+
+                tacticsRow.appendChild(column);
+            });
+
+            // Update stats
+            document.getElementById('tactic-count').textContent = totalTactics;
+            document.getElementById('technique-count').textContent = totalTechniques;
+
+            // Re-apply selected state to technique cards
+            selectedMitre.forEach(mid => {
+                const cards = document.querySelectorAll(`[data-technique="${mid}"]`);
+                cards.forEach(c => c.classList.add('selected'));
+            });
+        }
+
+        function buildTechniquesPanel(techniques) {
+            if (!techniques || techniques.size === 0) return '';
+
+            let html = '';
+            techniques.forEach((subtechniques, baseId) => {
+                const name = techniqueNames[baseId] || baseId;
+                const count = subtechniques.length;
+                const hasSubtechniques = subtechniques.some(s => s.includes('.'));
+                const isSelected = selectedMitre.has(baseId);
+
+                html += `
+                    <div class="technique-card ${isSelected ? 'selected' : ''}" data-technique="${baseId}" onclick="toggleTechnique('${baseId}')">
+                        <div class="technique-card-header">
+                            <span class="technique-card-name">${name}</span>
+                            <span class="technique-card-count">${count}</span>
+                        </div>
+                        <span class="technique-card-id">${baseId}</span>
+                        ${hasSubtechniques ? '<span class="technique-card-expand">+ sub-techniques</span>' : ''}
+                    </div>
+                `;
+            });
+
+            return html;
         }
 
         function toggleTactic(tacticId) {
-            const group = document.querySelector(`[data-tactic="${tacticId}"]`);
-            const techniques = document.getElementById(`techniques-${tacticId}`);
-            const toggle = group.querySelector('.tactic-toggle');
+            const column = document.querySelector(`[data-tactic-id="${tacticId}"]`);
+            const header = column.querySelector('.tactic-header');
+            const panel = document.getElementById(`panel-${tacticId}`);
 
-            if (group.classList.contains('expanded')) {
-                group.classList.remove('expanded');
-                techniques.style.display = 'none';
-                toggle.textContent = '▶';
+            if (!header.classList.contains('has-queries')) return;
+
+            if (expandedTactics.has(tacticId)) {
+                expandedTactics.delete(tacticId);
+                header.classList.remove('expanded');
+                panel.classList.remove('expanded');
             } else {
-                group.classList.add('expanded');
-                techniques.style.display = 'flex';
-                toggle.textContent = '▼';
+                expandedTactics.add(tacticId);
+                header.classList.add('expanded');
+                panel.classList.add('expanded');
             }
         }
 
-        function toggleTechnique(mid) {
-            const chip = document.querySelector(`[data-mid="${mid}"]`);
+        function toggleTechnique(techniqueId) {
+            const cards = document.querySelectorAll(`[data-technique="${techniqueId}"]`);
 
-            if (selectedMitre.has(mid)) {
-                selectedMitre.delete(mid);
-                chip?.classList.remove('selected');
+            if (selectedMitre.has(techniqueId)) {
+                selectedMitre.delete(techniqueId);
+                cards.forEach(c => c.classList.remove('selected'));
             } else {
-                selectedMitre.add(mid);
-                chip?.classList.add('selected');
+                selectedMitre.add(techniqueId);
+                cards.forEach(c => c.classList.add('selected'));
             }
 
             updateSelectedDisplay();
@@ -206,43 +339,58 @@
         }
 
         function updateSelectedDisplay() {
-            const display = document.getElementById('selected-mitre-display');
+            const display = document.getElementById('selected-display');
             const tagsContainer = document.getElementById('selected-tags');
 
             if (selectedMitre.size === 0) {
                 display.classList.remove('has-selection');
-                tagsContainer.innerHTML = '<span class="no-selection">None</span>';
+                tagsContainer.innerHTML = '';
             } else {
                 display.classList.add('has-selection');
-                tagsContainer.innerHTML = Array.from(selectedMitre).map(mid =>
-                    `<span class="selected-tag" onclick="toggleTechnique('${mid}')">${mid} ×</span>`
-                ).join('');
+                tagsContainer.innerHTML = Array.from(selectedMitre).map(mid => {
+                    const name = techniqueNames[mid] || mid;
+                    return `<span class="selected-tag" onclick="toggleTechnique('${mid}')">${name} <span class="remove">×</span></span>`;
+                }).join('');
             }
         }
 
-        function clearMitreSelection() {
+        function clearAllFilters() {
+            // Clear MITRE selection
             selectedMitre.clear();
-            document.querySelectorAll('.technique-chip.selected').forEach(el => {
+            document.querySelectorAll('.technique-card.selected').forEach(el => {
                 el.classList.remove('selected');
             });
+
+            // Reset dropdowns
+            document.getElementById('filter-content-type').value = 'all';
+            document.getElementById('filter-category').value = 'all';
+            document.getElementById('filter-log-source').value = 'all';
+            document.getElementById('search-input').value = '';
+
             updateSelectedDisplay();
+            buildMitreMatrix();
+            triggerSearch();
+        }
+
+        function onFilterChange() {
+            // Rebuild MITRE matrix based on new filter state
+            buildMitreMatrix();
             triggerSearch();
         }
 
         function triggerSearch() {
-            // Build the URL with all filter params
             const params = new URLSearchParams();
 
             const q = document.getElementById('search-input')?.value || '';
             if (q) params.append('q', q);
 
-            const contentType = document.querySelector('select[name="content_type"]')?.value || 'all';
+            const contentType = document.getElementById('filter-content-type')?.value || 'all';
             if (contentType !== 'all') params.append('content_type', contentType);
 
-            const category = document.querySelector('select[name="category"]')?.value || 'all';
+            const category = document.getElementById('filter-category')?.value || 'all';
             if (category !== 'all') params.append('category', category);
 
-            const logSource = document.querySelector('select[name="log_source"]')?.value || 'all';
+            const logSource = document.getElementById('filter-log-source')?.value || 'all';
             if (logSource !== 'all') params.append('log_source', logSource);
 
             selectedMitre.forEach(mid => params.append('mitre', mid));
@@ -250,22 +398,8 @@
             htmx.ajax('GET', `/search?${params.toString()}`, '#results-grid');
         }
 
-        // Override HTMX to include MITRE selection
-        document.body.addEventListener('htmx:configRequest', function(evt) {
-            if (selectedMitre.size > 0) {
-                selectedMitre.forEach(mid => {
-                    evt.detail.parameters['mitre'] = evt.detail.parameters['mitre'] || [];
-                    if (Array.isArray(evt.detail.parameters['mitre'])) {
-                        evt.detail.parameters['mitre'].push(mid);
-                    } else {
-                        evt.detail.parameters['mitre'] = [evt.detail.parameters['mitre'], mid];
-                    }
-                });
-            }
-        });
-
         // Initialize on load
-        document.addEventListener('DOMContentLoaded', initMitreMatrix);
+        document.addEventListener('DOMContentLoaded', buildMitreMatrix);
     </script>
 
 </body>
