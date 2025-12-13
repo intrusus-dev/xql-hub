@@ -1,0 +1,43 @@
+name: "User added to high privileged AD group"
+author: "xql-hub-admin"  # You can change this to your handle
+description: "Detection of a successful addition of a member to one of the highly privileged Active Directory security groups. This activity could signify an attempt to escalate privileges or compromise an account within the domain."
+severity: "High"
+content_type: correlation
+category: "Identity & Access"
+tags:
+  - "Active Directory"
+  - "Privilege Escalation"
+  - "Persistence"
+  - "Identity"
+mitre_ids:
+  - "T1098.007"
+  - "T1098"
+  - "T1078.002"
+log_sources:
+  - "Microsoft Windows"
+query:
+  dataset = microsoft_windows_raw 
+  | filter event_id in (4728, 4732, 4756)
+  | filter event_result = "success"
+  | alter target_sid = json_extract_scalar(event_data, "$.TargetSid")
+  | alter subject_username = json_extract_scalar(event_data, "$.SubjectUserName")
+  | alter subject_logon_id = json_extract_scalar(event_data, "$.SubjectLogonId")
+  | alter target_user_name = json_extract_scalar(event_data, "$.TargetUserName") 
+  | alter subject_user_sid = json_extract_scalar(event_data, "$.SubjectUserSid")
+  | alter added_member_full_dn = json_extract_scalar(event_data, "$.MemberName") 
+  | alter added_member_sid = json_extract_scalar(event_data, "$.MemberSid")
+  | alter target_domain_name = json_extract_scalar(event_data, "$.TargetDomainName")
+  | alter subject_domain_name = json_extract_scalar(event_data, "$.SubjectDomainName")
+  | alter privilege_list = json_extract_scalar(event_data, "$.PrivilegeList")
+  | alter added_member = arrayindex(regextract(added_member_full_dn, "CN=([^,]+)"),0)
+  | alter short_host = arrayindex(split(host_name, "."), 0)
+  | filter target_user_name in (
+      "Enterprise Admins",
+      "Domain Admins",
+      "Schema Admins",
+      "Administrators",
+      "DnsAdmins",
+      "DHCP Administrators",
+      "Backup Operators",
+      "Server Operators"
+  )

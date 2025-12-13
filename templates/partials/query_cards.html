@@ -1,0 +1,29 @@
+{% for query in queries %}
+<div class="card type-{{ query.content_type }}">
+    <div class="card-header">
+        <div class="header-top">
+            <span class="badge {{ query.content_type }}">{{ query.content_type|upper }}</span>
+            <span class="dataset-badge">📂 {{ query.dataset }}</span>
+        </div>
+        <h2>{{ query.name }}</h2>
+    </div>
+
+    <div class="mitre-section">
+        {% for mid in query.mitre_ids %}
+        <a href="https://attack.mitre.org/techniques/{{ mid }}" target="_blank" class="mitre-tag">
+            🎯 {{ mid }}
+        </a>
+        {% endfor %}
+    </div>
+
+    <p class="desc">{{ query.description }}</p>
+
+    <div class="code-preview">
+        <pre>{{ query.query }}</pre>
+    </div>
+</div>
+{% endfor %}
+
+{% if not queries %}
+<div class="no-results">No queries match your filter.</div>
+{% endif %}

@@ -1,0 +1,130 @@
+:root {
+    --bg-color: #121212;
+    --card-bg: #1e1e1e;
+    --text-primary: #e0e0e0;
+    --text-secondary: #a0a0a0;
+    --accent: #00bcd4; /* Cortex Blue-ish */
+    --accent-hover: #00acc1;
+    --code-bg: #2d2d2d;
+    --border: #333;
+}
+
+body {
+    background-color: var(--bg-color);
+    color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+}
+
+header {
+    background-color: var(--card-bg);
+    border-bottom: 1px solid var(--border);
+    padding: 1rem 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+h1 { margin: 0; font-size: 1.5rem; color: var(--accent); }
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+/* Search Bar Area */
+.search-box {
+    margin-bottom: 2rem;
+    display: flex;
+    gap: 10px;
+}
+
+input[type="text"] {
+    flex-grow: 1;
+    padding: 12px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--card-bg);
+    color: white;
+    font-size: 1rem;
+}
+
+/* Query Grid */
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 20px;
+}
+
+.card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    transition: transform 0.2s;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    border-color: var(--accent);
+}
+
+.card-header h2 {
+    margin-top: 0;
+    font-size: 1.2rem;
+    color: var(--text-primary);
+}
+
+.meta {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-bottom: 10px;
+}
+
+.tags { margin: 10px 0; }
+
+.tag {
+    background: #333;
+    color: var(--accent);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    margin-right: 5px;
+    display: inline-block;
+}
+
+/* Add this to style.css */
+.type-badge {
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: bold;
+    font-size: 0.7rem;
+}
+
+.type-badge.xql {
+    background-color: #2196F3;
+    color: white;
+}
+
+.type-badge.correlation {
+    background-color: #FF9800;
+    color: black;
+}
+.type-badge.bioc {
+    background-color: #E91E63;
+    color: white;
+}
+
+/* Code Block */
+pre {
+    background: var(--code-bg);
+    padding: 15px;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-family: 'Fira Code', monospace;
+    font-size: 0.9rem;
+    border: 1px solid var(--border);
+    color: #a5d6ff;
+}

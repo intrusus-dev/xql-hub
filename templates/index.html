@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>XSIAM Hub</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Fira+Code&display=swap" rel="stylesheet">
+</head>
+<body>
+
+    <header>
+        <div class="logo">XSIAM <span>HUB</span></div>
+        <div class="search-bar">
+            <input type="text" name="q"
+                   placeholder="Search..."
+                   hx-get="/search"
+                   hx-target="#results-grid"
+                   hx-trigger="keyup changed delay:300ms"
+                   hx-include=".filter-select"> </div>
+    </header>
+
+    <div class="layout">
+        <aside class="sidebar">
+            <div class="filter-group">
+                <label>Content Type</label>
+                <select name="content_type" class="filter-select"
+                        hx-get="/search" hx-target="#results-grid" hx-include="[name='q'], .filter-select">
+                    <option value="all">All Types</option>
+                    {% for t in filters.types %}
+                    <option value="{{ t }}">{{ t|upper }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <label>Dataset</label>
+                <select name="dataset" class="filter-select"
+                        hx-get="/search" hx-target="#results-grid" hx-include="[name='q'], .filter-select">
+                    <option value="all">All Datasets</option>
+                    {% for d in filters.datasets %}
+                    <option value="{{ d }}">{{ d }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <label>MITRE TTP</label>
+                <select name="mitre" class="filter-select"
+                        hx-get="/search" hx-target="#results-grid" hx-include="[name='q'], .filter-select">
+                    <option value="all">All TTPs</option>
+                    {% for m in filters.mitre_ids %}
+                    <option value="{{ m }}">{{ m }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </aside>
+
+        <main id="results-grid" class="grid">
+            {% include "partials/query_cards.html" %}
+        </main>
+    </div>
+
+</body>
+</html>
