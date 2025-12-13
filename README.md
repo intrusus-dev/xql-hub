@@ -26,29 +26,8 @@ We are building towards a comprehensive "GitOps" driven content hub.
 * **Phase 4:** Automatic validation (CI/CD) of submitted content.
 
 ## 🤝 How to Contribute
-We welcome contributions! If you have a useful query, please share it.
-
-### Adding a Query
-1.  **Fork** this repository.
-2.  Create a new `.yaml` file in the `queries/` directory.
-3.  Use the format below:
-
-```yaml
-name: "Suspicious PowerShell Download"
-author: "YourGitHubHandle"
-description: "Detects PowerShell using Net.WebClient to download files, often used by downloaders."
-tags:
-  - "Hunting"
-  - "PowerShell"
-log_sources:
-  - "Endpoint"
-query: |
-  dataset = xdr_data
-  | filter action_result = "SUCCESS"
-  | filter event_type = "PROCESS"
-  | filter command_line contains "Net.WebClient"
-  | filter command_line contains "DownloadString"
-```
+We're currently building up the project.
+Feel free to contribute after we published it.
 
 4.  Submit a Pull Request (PR).
 
