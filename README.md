@@ -29,7 +29,6 @@ We are building towards a comprehensive "GitOps" driven content hub.
 We're currently building up the project.
 Feel free to contribute after we published it.
 
-4.  Submit a Pull Request (PR).
 
 ## ⚠️ Disclaimer
 XSIAM Hub is an independent community project and is not affiliated with, endorsed by, or sponsored by Palo Alto Networks. All content is provided "as is" without warranty. Always test queries on alerts that relate to non-critical assets first.
