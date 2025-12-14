@@ -1,7 +1,6 @@
 name: "Suspicious PowerShell Execution"
 author: "Leon Schulze"
 description: "Detects potentially malicious PowerShell command execution patterns including encoded commands, download cradles, and execution policy bypasses commonly used by attackers."
-severity: "High"
 content_type: hunting
 category: "Endpoint Security"
 tags:
