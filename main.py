@@ -1,5 +1,6 @@
 import os
 import yaml
+import json
 import subprocess
 from fastapi import FastAPI, Request, Query
 from fastapi.staticfiles import StaticFiles
@@ -17,6 +18,7 @@ FILTER_OPTIONS = {
     "log_sources": set(),
     "types": set()
 }
+MITRE_DATA = {}
 
 # MITRE ATT&CK Enterprise Tactics (in kill chain order)
 MITRE_TACTICS = [
@@ -35,6 +37,22 @@ MITRE_TACTICS = [
     {"id": "TA0010", "name": "Exfiltration", "shortname": "exfil"},
     {"id": "TA0040", "name": "Impact", "shortname": "impact"},
 ]
+
+
+def load_mitre_data():
+    """Load MITRE ATT&CK data with proper many-to-many tactic mappings."""
+    global MITRE_DATA
+    if os.path.exists("static/mitre_data.json"):
+        try:
+            with open("static/mitre_data.json", "r") as f:
+                MITRE_DATA = json.load(f)
+            print(f"Loaded {len(MITRE_DATA)} MITRE techniques with tactic mappings")
+        except Exception as e:
+            print(f"Error loading MITRE data: {e}")
+            MITRE_DATA = {}
+    else:
+        print("Warning: static/mitre_data.json not found. Run tools/update_mitre.py to generate it.")
+        MITRE_DATA = {}
 
 
 def load_queries():
@@ -72,6 +90,7 @@ def load_queries():
                         print(f"Error loading {filename}: {e}")
 
 
+load_mitre_data()
 load_queries()
 
 
@@ -102,7 +121,8 @@ async def homepage(request: Request):
         "queries": QUERY_DB,
         "filters": {k: sorted(list(v)) for k, v in FILTER_OPTIONS.items()},
         "tactics": MITRE_TACTICS,
-        "techniques_in_use": techniques_in_use
+        "techniques_in_use": techniques_in_use,
+        "mitre_data": MITRE_DATA
     })
 
 
@@ -158,7 +178,8 @@ async def get_filters():
         "types": sorted(list(FILTER_OPTIONS["types"])),
         "log_sources": sorted(list(FILTER_OPTIONS["log_sources"])),
         "mitre_ids": sorted(list(FILTER_OPTIONS["mitre_ids"])),
-        "tactics": MITRE_TACTICS
+        "tactics": MITRE_TACTICS,
+        "mitre_data": MITRE_DATA
     }
 
 @app.post("/webhook/refresh")
@@ -170,7 +191,8 @@ async def refresh_content(request: Request):
         # 1. Pull latest code from git
         subprocess.run(["git", "pull"], check=True)
 
-        # 2. Reload the queries into memory
+        # 2. Reload MITRE data and queries into memory
+        load_mitre_data()
         load_queries()
 
         return {"status": "success", "message": "Content updated"}
