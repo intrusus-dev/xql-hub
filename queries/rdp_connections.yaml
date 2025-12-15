@@ -1,7 +1,6 @@
 name: "Remote Desktop Protocol Connections"
 author: "Leon Schulze"
 description: "Identifies RDP connection events that could indicate lateral movement within the network. Monitors both successful and failed RDP authentication attempts."
-severity: "Medium"
 content_type: hunting
 category: "Lateral Movement"
 tags:
