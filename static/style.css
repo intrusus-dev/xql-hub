@@ -361,10 +361,6 @@ header {
     gap: 0.5rem;
 }
 
-.mitre-matrix-header h3::before {
-    content: '🎯';
-}
-
 .mitre-stats {
     display: flex;
     align-items: center;

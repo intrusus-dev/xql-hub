@@ -50,7 +50,7 @@ CONTENT_TYPE_LABELS = {
 
 
 def load_mitre_data():
-    """Load MITRE ATT&CK data with proper many-to-many tactic mappings."""
+    # Load MITRE ATT&CK data with proper many-to-many tactic mappings.
     global MITRE_DATA
     if os.path.exists("static/mitre_data.json"):
         try:
@@ -72,7 +72,7 @@ def load_queries():
 
     if os.path.exists("queries"):
         for filename in os.listdir("queries"):
-            if filename.endswith(".yaml"):
+            if filename.endswith((".yaml", ".yml")):
                 with open(f"queries/{filename}", "r") as f:
                     try:
                         data = yaml.safe_load(f)
@@ -107,7 +107,7 @@ load_queries()
 
 
 def organize_mitre_by_tactic():
-    """Organize available MITRE IDs by tactic for the matrix view."""
+    # Organize available MITRE IDs by tactic for the matrix view.
     # Group techniques by their base ID and collect all from queries
     techniques_in_use = {}
     for query in QUERY_DB:
@@ -127,7 +127,7 @@ def organize_mitre_by_tactic():
 @app.get("/", response_class=HTMLResponse)
 async def homepage(request: Request):
     techniques_in_use = organize_mitre_by_tactic()
-
+    # Render the landing page with all queries and filters available.
     return templates.TemplateResponse("index.html", {
         "request": request,
         "queries": QUERY_DB,
@@ -141,7 +141,7 @@ async def homepage(request: Request):
 
 @app.get("/contribute", response_class=HTMLResponse)
 async def contribute_wizard(request: Request):
-    """Render the contribution wizard page."""
+    # Render the contribution wizard page.
     return templates.TemplateResponse("wizard.html", {
         "request": request,
         "tactics": MITRE_TACTICS,
@@ -196,7 +196,7 @@ async def search(
 
 @app.get("/api/filters", response_class=JSONResponse)
 async def get_filters():
-    """API endpoint to get all available filter options."""
+    #API endpoint to get all available filter options.
     return {
         "types": sorted(list(FILTER_OPTIONS["types"])),
         "log_sources": sorted(list(FILTER_OPTIONS["log_sources"])),
@@ -208,15 +208,13 @@ async def get_filters():
 
 @app.get("/api/content-types", response_class=JSONResponse)
 async def get_content_types():
-    """API endpoint to get content type labels."""
+    # API endpoint to get content type labels.
     return CONTENT_TYPE_LABELS
 
 
 @app.post("/webhook/refresh")
 async def refresh_content(request: Request):
-    """
-    Called by GitHub Webhook. Pulls latest changes and reloads memory.
-    """
+    # Called by GitHub Webhook. Pulls latest changes and reloads memory.
     try:
         # 1. Pull latest code from git
         subprocess.run(["git", "pull"], check=True)
