@@ -1,6 +1,8 @@
 name: "User added to high privileged AD group"
 author: "Leon Schulze"
+created: "2025-01-10"
 description: "Detection of a successful addition of a member to one of the highly privileged Active Directory security groups. This activity could signify an attempt to escalate privileges or compromise an account within the domain."
+severity: "High"
 content_type: correlation
 category: "Identity & Access"
 tags:

@@ -49,6 +49,8 @@
                 <div class="filter-group">
                     <label>Sort By</label>
                     <select name="sort_by" id="filter-sort" class="filter-select" onchange="onFilterChange()">
+                        <option value="created-desc" selected>Created (Newest)</option>
+                        <option value="created-asc">Created (Oldest)</option>
                         <option value="name">Name (A-Z)</option>
                         <option value="name-desc">Name (Z-A)</option>
                         <option value="severity">Severity (High first)</option>
@@ -277,12 +279,9 @@
                 const isSelected = selectedMitre.has(baseId);
 
                 html += `
-                    <div class="technique-card ${isSelected ? 'selected' : ''}" data-technique="${baseId}" onclick="toggleTechnique('${baseId}')">
-                        <div class="technique-card-header">
-                            <span class="technique-card-name">${name}</span>
-                            <span class="technique-card-count">${queryCount}</span>
-                        </div>
+                    <div class="technique-card ${isSelected ? 'selected' : ''}" data-technique="${baseId}" onclick="toggleTechnique('${baseId}')" title="${name}">
                         <span class="technique-card-id">${baseId}</span>
+                        <span class="technique-card-count">${queryCount}</span>
                     </div>
                 `;
             });
@@ -356,6 +355,7 @@
             // Reset dropdowns
             document.getElementById('filter-content-type').value = 'all';
             document.getElementById('filter-log-source').value = 'all';
+            document.getElementById('filter-sort').value = 'created-desc';
             document.getElementById('search-input').value = '';
 
             updateSelectedDisplay();
@@ -381,13 +381,19 @@
             const logSource = document.getElementById('filter-log-source')?.value || 'all';
             if (logSource !== 'all') params.append('log_source', logSource);
 
+            const sort = document.getElementById('filter-sort')?.value || 'created-desc';
+            params.append('sort', sort);
+
             selectedMitre.forEach(mid => params.append('mitre', mid));
 
             htmx.ajax('GET', `/search?${params.toString()}`, '#results-grid');
         }
 
         // Initialize on load
-        document.addEventListener('DOMContentLoaded', buildMitreMatrix);
+        document.addEventListener('DOMContentLoaded', function() {
+            buildMitreMatrix();
+            triggerSearch();
+        });
     </script>
 
 </body>

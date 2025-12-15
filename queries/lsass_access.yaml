@@ -1,6 +1,8 @@
 name: "LSASS Memory Access Detection"
 author: "Leon Schulze"
+created: "2025-01-12"
 description: "Detects attempts to access LSASS process memory, which is commonly used by credential dumping tools like Mimikatz to extract passwords and hashes from memory."
+severity: "Critical"
 content_type: bioc
 category: "Credential Theft"
 tags:
@@ -12,7 +14,7 @@ mitre_ids:
   - "T1003"
 log_sources:
   - "Cortex XDR Agent"
-query:
+query: |
   dataset = xdr_data 
   | filter event_type = PROCESS
   | filter action_process_image_name = "lsass.exe"

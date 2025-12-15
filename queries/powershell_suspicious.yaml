@@ -1,6 +1,8 @@
 name: "Suspicious PowerShell Execution"
 author: "Leon Schulze"
+created: "2025-01-08"
 description: "Detects potentially malicious PowerShell command execution patterns including encoded commands, download cradles, and execution policy bypasses commonly used by attackers."
+severity: "High"
 content_type: hunting
 category: "Endpoint Security"
 tags:
@@ -12,7 +14,7 @@ mitre_ids:
   - "T1059"
 log_sources:
   - "Cortex XDR Agent"
-query:
+query: |
   dataset = xdr_data 
   | filter event_type = PROCESS
   | filter action_process_image_name ~= "powershell"

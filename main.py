@@ -75,6 +75,8 @@ def load_queries():
                             data['mitre_ids'] = []
                         if 'log_sources' not in data:
                             data['log_sources'] = []
+                        if 'tags' not in data:
+                            data['tags'] = []
 
                         # Populate Filter Lists
                         FILTER_OPTIONS["types"].add(data['content_type'])
@@ -133,9 +135,9 @@ async def search(
         content_type: str = "",
         mitre: List[str] = Query(default=[]),
         log_source: str = "",
-        sort_by: str = "name"
+        sort: str = "created-desc"
 ):
-    filtered = QUERY_DB
+    filtered = QUERY_DB.copy()
     q_lower = q.lower()
 
     # 1. Text Search
@@ -166,17 +168,21 @@ async def search(
     if log_source and log_source != "all":
         filtered = [x for x in filtered if log_source in x.get('log_sources', [])]
 
-    # 5. Sorting
+    # 5. Sort results
     severity_order = {'critical': 0, 'high': 1, 'medium': 2, 'low': 3, '': 4}
 
-    if sort_by == "name":
-        filtered = sorted(filtered, key=lambda x: x.get('name', '').lower())
-    elif sort_by == "name-desc":
-        filtered = sorted(filtered, key=lambda x: x.get('name', '').lower(), reverse=True)
-    elif sort_by == "severity":
-        filtered = sorted(filtered, key=lambda x: severity_order.get(x.get('severity', '').lower(), 4))
-    elif sort_by == "type":
-        filtered = sorted(filtered, key=lambda x: x.get('content_type', ''))
+    if sort == "name":
+        filtered.sort(key=lambda x: x.get('name', '').lower())
+    elif sort == "name-desc":
+        filtered.sort(key=lambda x: x.get('name', '').lower(), reverse=True)
+    elif sort == "severity":
+        filtered.sort(key=lambda x: severity_order.get(x.get('severity', '').lower(), 4))
+    elif sort == "type":
+        filtered.sort(key=lambda x: x.get('content_type', ''))
+    elif sort == "created-desc":
+        filtered.sort(key=lambda x: x.get('created', ''), reverse=True)
+    elif sort == "created-asc":
+        filtered.sort(key=lambda x: x.get('created', ''))
 
     return templates.TemplateResponse("partials/query_cards.html", {
         "request": request,
