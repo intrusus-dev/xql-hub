@@ -10,13 +10,20 @@
 <body>
 
     <header>
-        <div class="logo">XSIAM <span>HUB</span></div>
+        <a href="/" class="logo">XSIAM <span>HUB</span></a>
         <div class="header-controls">
             <div class="search-bar">
                 <input type="text" name="q" id="search-input"
                        placeholder="Search queries..."
                        oninput="onFilterChange()">
             </div>
+            <a href="/contribute" class="contribute-btn">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                Contribute
+            </a>
         </div>
     </header>
 
@@ -31,7 +38,15 @@
                     <select name="content_type" id="filter-content-type" class="filter-select" onchange="onFilterChange()">
                         <option value="all">All Types</option>
                         {% for t in filters.types %}
-                        <option value="{{ t }}">{{ t|upper if t == 'bioc' else 'Threat Hunting' if t == 'hunting' else 'IT Hygiene' if t == 'hygiene' else t|title }}</option>
+                        <option value="{{ t }}">
+                            {% if t == 'bioc' %}BIOC
+                            {% elif t == 'hunting' %}Threat Hunting
+                            {% elif t == 'hygiene' %}IT Hygiene
+                            {% elif t == 'correlation' %}Correlation Rule
+                            {% elif t == 'widget' %}Dashboard Widget
+                            {% else %}{{ t|title }}
+                            {% endif %}
+                        </option>
                         {% endfor %}
                     </select>
                 </div>
@@ -49,8 +64,6 @@
                 <div class="filter-group">
                     <label>Sort By</label>
                     <select name="sort_by" id="filter-sort" class="filter-select" onchange="onFilterChange()">
-                        <option value="created-desc" selected>Created (Newest)</option>
-                        <option value="created-asc">Created (Oldest)</option>
                         <option value="name">Name (A-Z)</option>
                         <option value="name-desc">Name (Z-A)</option>
                         <option value="severity">Severity (High first)</option>
@@ -66,6 +79,22 @@
                     </svg>
                     Clear All Filters
                 </button>
+            </div>
+
+            <!-- Contribute CTA in sidebar -->
+            <div class="sidebar-section sidebar-cta">
+                <div class="cta-card">
+                    <div class="cta-icon">🎁</div>
+                    <h4>Share Your Queries</h4>
+                    <p>Help the community by contributing your detection content.</p>
+                    <a href="/contribute" class="cta-btn">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                        Contribute Now
+                    </a>
+                </div>
             </div>
         </aside>
 
@@ -279,9 +308,12 @@
                 const isSelected = selectedMitre.has(baseId);
 
                 html += `
-                    <div class="technique-card ${isSelected ? 'selected' : ''}" data-technique="${baseId}" onclick="toggleTechnique('${baseId}')" title="${name}">
+                    <div class="technique-card ${isSelected ? 'selected' : ''}" data-technique="${baseId}" onclick="toggleTechnique('${baseId}')">
+                        <div class="technique-card-header">
+                            <span class="technique-card-name">${name}</span>
+                            <span class="technique-card-count">${queryCount}</span>
+                        </div>
                         <span class="technique-card-id">${baseId}</span>
-                        <span class="technique-card-count">${queryCount}</span>
                     </div>
                 `;
             });
@@ -355,7 +387,6 @@
             // Reset dropdowns
             document.getElementById('filter-content-type').value = 'all';
             document.getElementById('filter-log-source').value = 'all';
-            document.getElementById('filter-sort').value = 'created-desc';
             document.getElementById('search-input').value = '';
 
             updateSelectedDisplay();
@@ -381,19 +412,13 @@
             const logSource = document.getElementById('filter-log-source')?.value || 'all';
             if (logSource !== 'all') params.append('log_source', logSource);
 
-            const sort = document.getElementById('filter-sort')?.value || 'created-desc';
-            params.append('sort', sort);
-
             selectedMitre.forEach(mid => params.append('mitre', mid));
 
             htmx.ajax('GET', `/search?${params.toString()}`, '#results-grid');
         }
 
         // Initialize on load
-        document.addEventListener('DOMContentLoaded', function() {
-            buildMitreMatrix();
-            triggerSearch();
-        });
+        document.addEventListener('DOMContentLoaded', buildMitreMatrix);
     </script>
 
 </body>
