@@ -132,7 +132,8 @@ async def search(
         q: str = "",
         content_type: str = "",
         mitre: List[str] = Query(default=[]),
-        log_source: str = ""
+        log_source: str = "",
+        sort_by: str = "name"
 ):
     filtered = QUERY_DB
     q_lower = q.lower()
@@ -165,6 +166,18 @@ async def search(
     if log_source and log_source != "all":
         filtered = [x for x in filtered if log_source in x.get('log_sources', [])]
 
+    # 5. Sorting
+    severity_order = {'critical': 0, 'high': 1, 'medium': 2, 'low': 3, '': 4}
+
+    if sort_by == "name":
+        filtered = sorted(filtered, key=lambda x: x.get('name', '').lower())
+    elif sort_by == "name-desc":
+        filtered = sorted(filtered, key=lambda x: x.get('name', '').lower(), reverse=True)
+    elif sort_by == "severity":
+        filtered = sorted(filtered, key=lambda x: severity_order.get(x.get('severity', '').lower(), 4))
+    elif sort_by == "type":
+        filtered = sorted(filtered, key=lambda x: x.get('content_type', ''))
+
     return templates.TemplateResponse("partials/query_cards.html", {
         "request": request,
         "queries": filtered
@@ -182,6 +195,7 @@ async def get_filters():
         "mitre_data": MITRE_DATA
     }
 
+
 @app.post("/webhook/refresh")
 async def refresh_content(request: Request):
     """
@@ -198,6 +212,7 @@ async def refresh_content(request: Request):
         return {"status": "success", "message": "Content updated"}
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+
 
 if __name__ == "__main__":
     import uvicorn

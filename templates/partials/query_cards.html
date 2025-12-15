@@ -13,8 +13,20 @@
             {% else %}
             <span class="badge {{ query.content_type }}">{{ query.content_type|upper }}</span>
             {% endif %}
+            {% if query.severity %}
+            <span class="severity-badge severity-{{ query.severity|lower }}">{{ query.severity }}</span>
+            {% endif %}
         </div>
         <h2>{{ query.name }}</h2>
+        {% if query.author %}
+        <div class="card-author">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                <circle cx="12" cy="7" r="4"></circle>
+            </svg>
+            <span>{{ query.author }}</span>
+        </div>
+        {% endif %}
     </div>
 
     {% if query.mitre_ids %}
@@ -29,13 +41,18 @@
 
     <p class="desc">{{ query.description }}</p>
 
-    {% if query.log_sources %}
-    <div class="log-sources">
-        {% for src in query.log_sources %}
-        <span class="log-source-tag">📋 {{ src }}</span>
-        {% endfor %}
+    <div class="meta-tags">
+        {% if query.log_sources %}
+            {% for src in query.log_sources %}
+            <span class="meta-tag log-source-tag" onclick="filterByLogSource('{{ src }}')" title="Click to filter by this log source">📋 {{ src }}</span>
+            {% endfor %}
+        {% endif %}
+        {% if query.tags %}
+            {% for tag in query.tags %}
+            <span class="meta-tag query-tag" onclick="filterByTag('{{ tag }}')" title="Click to filter by this tag">{{ tag }}</span>
+            {% endfor %}
+        {% endif %}
     </div>
-    {% endif %}
 
     <div class="code-preview">
         <button class="copy-btn" onclick="copyCode(this)" title="Copy to clipboard">
@@ -64,5 +81,31 @@ function copyCode(btn) {
         btn.classList.add('copied');
         setTimeout(() => btn.classList.remove('copied'), 2000);
     });
+}
+
+function filterByTag(tag) {
+    const searchInput = document.getElementById('search-input');
+    if (searchInput) {
+        searchInput.value = tag;
+        if (typeof onFilterChange === 'function') {
+            onFilterChange();
+        }
+    }
+}
+
+function filterByLogSource(logSource) {
+    const logSourceSelect = document.getElementById('filter-log-source');
+    if (logSourceSelect) {
+        // Find and select the matching option
+        for (let option of logSourceSelect.options) {
+            if (option.value === logSource) {
+                logSourceSelect.value = logSource;
+                break;
+            }
+        }
+        if (typeof onFilterChange === 'function') {
+            onFilterChange();
+        }
+    }
 }
 </script>

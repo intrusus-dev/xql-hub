@@ -26,6 +26,12 @@
     --xql: #1d9bf0;
     --bioc: #e91e63;
 
+    /* Severity colors */
+    --severity-critical: #ff4757;
+    --severity-high: #ff6b35;
+    --severity-medium: #ffa502;
+    --severity-low: #7bed9f;
+
     /* Tactic highlight colors */
     --tactic-active: #3b82f6;
     --tactic-warning: #f59e0b;
@@ -42,6 +48,8 @@
     --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
     --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
     --shadow-lg: 0 8px 30px rgba(0, 0, 0, 0.6);
+
+    --sidebar-width: 240px;
 }
 
 *, *::before, *::after {
@@ -103,7 +111,7 @@ header {
 }
 
 .search-bar {
-    flex: 0 1 320px;
+    flex: 0 1 400px;
 }
 
 .search-bar input[type="text"] {
@@ -129,25 +137,89 @@ header {
     background: var(--bg-elevated);
 }
 
-/* ========== FILTER BAR ========== */
-.filter-bar {
-    background: var(--bg-base);
-    border-bottom: 1px solid var(--border-subtle);
-    padding: 1rem 2rem;
-    display: flex;
-    gap: 1rem;
-    align-items: center;
-    flex-wrap: wrap;
+/* ========== APP LAYOUT ========== */
+.app-layout {
+    display: grid;
+    grid-template-columns: var(--sidebar-width) 1fr;
+    min-height: calc(100vh - 60px);
 }
 
+/* ========== SIDEBAR ========== */
+.sidebar {
+    background: var(--bg-base);
+    border-right: 1px solid var(--border-subtle);
+    padding: 1.5rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    overflow-y: auto;
+    position: sticky;
+    top: 60px;
+    height: calc(100vh - 60px);
+}
+
+.sidebar::-webkit-scrollbar {
+    width: 4px;
+}
+
+.sidebar::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+    background: var(--border-strong);
+    border-radius: 2px;
+}
+
+.sidebar-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.sidebar-title {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    margin: 0;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.clear-filters-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.75rem 1rem;
+    background: transparent;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.clear-filters-btn:hover {
+    background: var(--bg-elevated);
+    border-color: var(--danger);
+    color: var(--danger);
+}
+
+/* ========== FILTER GROUP (in sidebar) ========== */
 .filter-group {
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
+    gap: 0.35rem;
 }
 
 .filter-group label {
-    font-size: 0.65rem;
+    font-size: 0.7rem;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.06em;
@@ -155,7 +227,7 @@ header {
 }
 
 .filter-select {
-    padding: 8px 32px 8px 12px;
+    padding: 10px 32px 10px 12px;
     border-radius: var(--radius-sm);
     border: 1px solid var(--border-default);
     background: var(--bg-surface);
@@ -168,7 +240,7 @@ header {
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%238899a6' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: right 10px center;
-    min-width: 160px;
+    width: 100%;
 }
 
 .filter-select:hover {
@@ -181,11 +253,19 @@ header {
     box-shadow: 0 0 0 2px var(--accent-glow);
 }
 
+/* ========== MAIN AREA ========== */
+.main-area {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    overflow-x: hidden;
+}
+
 /* ========== MITRE MATRIX ========== */
 .mitre-matrix-container {
     background: var(--bg-base);
     border-bottom: 1px solid var(--border-subtle);
-    padding: 1rem 2rem;
+    padding: 1rem 1.5rem;
 }
 
 .mitre-matrix-header {
@@ -212,29 +292,23 @@ header {
 }
 
 .mitre-stats {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.stat-pill {
     font-size: 0.8rem;
     color: var(--text-secondary);
-}
-
-.mitre-stats strong {
-    color: var(--accent);
-}
-
-.clear-mitre-btn {
-    background: none;
+    padding: 4px 12px;
+    background: var(--bg-surface);
     border: 1px solid var(--border-default);
-    color: var(--text-secondary);
-    font-size: 0.75rem;
-    cursor: pointer;
-    padding: 4px 10px;
-    border-radius: var(--radius-sm);
-    transition: all 0.15s;
+    border-radius: 20px;
 }
 
-.clear-mitre-btn:hover {
-    background: var(--bg-elevated);
-    border-color: var(--accent);
+.stat-pill strong {
     color: var(--accent);
+    font-weight: 600;
 }
 
 /* Tactics Row */
@@ -260,7 +334,7 @@ header {
 
 .tactic-column {
     flex: 1;
-    min-width: 95px;
+    min-width: 90px;
     display: flex;
     flex-direction: column;
 }
@@ -305,7 +379,7 @@ header {
 }
 
 .tactic-name {
-    font-size: 0.7rem;
+    font-size: 0.65rem;
     color: var(--text-primary);
     line-height: 1.2;
     display: block;
@@ -344,8 +418,9 @@ header {
     padding: 0.5rem;
     gap: 0.4rem;
     flex-direction: column;
-    max-height: 280px;
+    max-height: 300px;
     overflow-y: auto;
+    overflow-x: hidden;
 }
 
 .techniques-panel::-webkit-scrollbar {
@@ -369,10 +444,11 @@ header {
     background: var(--bg-surface);
     border: 1px solid var(--border-default);
     border-radius: var(--radius-sm);
-    padding: 0.5rem;
+    padding: 0.5rem 0.6rem;
     cursor: pointer;
     transition: all 0.15s;
     border-left: 3px solid transparent;
+    min-width: 0;
 }
 
 .technique-card:hover {
@@ -389,18 +465,20 @@ header {
 .technique-card-header {
     display: flex;
     justify-content: space-between;
-    align-items: flex-start;
-    gap: 0.5rem;
+    align-items: center;
+    gap: 0.4rem;
 }
 
 .technique-card-count {
-    font-size: 0.85rem;
+    font-size: 0.75rem;
     font-weight: 700;
     color: var(--accent);
     background: var(--bg-deep);
-    padding: 2px 6px;
+    padding: 2px 5px;
     border-radius: 4px;
     flex-shrink: 0;
+    min-width: 20px;
+    text-align: center;
 }
 
 .technique-card.selected .technique-card-count {
@@ -409,24 +487,22 @@ header {
 }
 
 .technique-card-name {
-    font-size: 0.7rem;
+    font-size: 0.68rem;
     color: var(--text-primary);
-    line-height: 1.3;
+    line-height: 1.25;
     flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .technique-card-id {
-    font-size: 0.6rem;
+    font-size: 0.58rem;
     color: var(--text-muted);
     font-family: 'JetBrains Mono', monospace;
-    margin-top: 0.2rem;
+    margin-top: 0.15rem;
     display: block;
-}
-
-.technique-card-expand {
-    font-size: 0.55rem;
-    color: var(--text-muted);
-    margin-top: 0.2rem;
 }
 
 /* Selected techniques display */
@@ -481,13 +557,14 @@ header {
 
 /* ========== MAIN CONTENT ========== */
 .main-content {
-    padding: 1.5rem 2rem;
+    padding: 1.5rem;
+    flex: 1;
 }
 
 /* ========== CARDS GRID ========== */
 .grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
     gap: 1.25rem;
     align-content: start;
 }
@@ -503,6 +580,7 @@ header {
     flex-direction: column;
     position: relative;
     overflow: hidden;
+    height: 100%;
 }
 
 .card::before {
@@ -534,6 +612,7 @@ header {
 /* Card Header */
 .card-header {
     margin-bottom: 0.75rem;
+    flex-shrink: 0;
 }
 
 .header-top {
@@ -541,6 +620,7 @@ header {
     align-items: center;
     gap: 0.5rem;
     margin-bottom: 0.5rem;
+    flex-wrap: wrap;
 }
 
 .badge {
@@ -572,12 +652,34 @@ header {
     color: var(--bioc);
 }
 
-.category-badge {
-    font-size: 0.7rem;
-    color: var(--text-muted);
-    padding: 2px 8px;
-    background: var(--bg-elevated);
+/* Severity badges */
+.severity-badge {
+    padding: 3px 8px;
     border-radius: 4px;
+    font-size: 0.6rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.severity-badge.severity-critical {
+    background: rgba(255, 71, 87, 0.15);
+    color: var(--severity-critical);
+}
+
+.severity-badge.severity-high {
+    background: rgba(255, 107, 53, 0.15);
+    color: var(--severity-high);
+}
+
+.severity-badge.severity-medium {
+    background: rgba(255, 165, 2, 0.15);
+    color: var(--severity-medium);
+}
+
+.severity-badge.severity-low {
+    background: rgba(123, 237, 159, 0.15);
+    color: var(--severity-low);
 }
 
 .card-header h2 {
@@ -586,6 +688,20 @@ header {
     font-weight: 600;
     color: var(--text-primary);
     line-height: 1.4;
+}
+
+/* Author display */
+.card-author {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-top: 0.5rem;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.card-author svg {
+    opacity: 0.6;
 }
 
 /* MITRE Section in Cards */
@@ -617,20 +733,47 @@ header {
     color: var(--accent);
 }
 
-/* Log Sources */
-.log-sources {
+/* Meta Tags (Log Sources + Tags combined) */
+.meta-tags {
     display: flex;
     flex-wrap: wrap;
     gap: 0.4rem;
     margin-bottom: 0.75rem;
 }
 
-.log-source-tag {
+.meta-tag {
+    display: inline-flex;
+    align-items: center;
     font-size: 0.7rem;
-    color: var(--text-muted);
-    padding: 3px 8px;
-    background: var(--bg-deep);
+    padding: 4px 10px;
     border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+
+.meta-tag.log-source-tag {
+    color: var(--text-muted);
+    background: var(--bg-deep);
+    border: 1px solid var(--border-subtle);
+}
+
+.meta-tag.log-source-tag:hover {
+    background: var(--bg-elevated);
+    border-color: var(--accent-muted);
+    color: var(--accent);
+}
+
+.meta-tag.query-tag {
+    color: var(--text-secondary);
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-default);
+}
+
+.meta-tag.query-tag:hover {
+    background: var(--accent-glow);
+    border-color: var(--accent);
+    color: var(--accent);
 }
 
 /* Description */
@@ -639,7 +782,7 @@ header {
     color: var(--text-secondary);
     line-height: 1.6;
     margin: 0 0 1rem 0;
-    flex-grow: 1;
+    flex: 1 0 auto;
 }
 
 /* Code Preview */
@@ -649,6 +792,8 @@ header {
     border-radius: var(--radius-md);
     overflow: hidden;
     position: relative;
+    margin-top: auto;
+    flex-shrink: 0;
 }
 
 .copy-btn {
@@ -739,6 +884,20 @@ header {
     .tactic-column {
         min-width: 85px;
     }
+
+    :root {
+        --sidebar-width: 220px;
+    }
+}
+
+@media (max-width: 1024px) {
+    :root {
+        --sidebar-width: 200px;
+    }
+
+    .grid {
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    }
 }
 
 @media (max-width: 768px) {
@@ -746,11 +905,29 @@ header {
         padding: 0 1rem;
     }
 
-    .filter-bar,
+    .app-layout {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .sidebar {
+        width: 100%;
+        position: static;
+        height: auto;
+        padding: 1rem;
+        border-right: none;
+        border-bottom: 1px solid var(--border-subtle);
+    }
+
     .mitre-matrix-container,
     .main-content {
         padding-left: 1rem;
         padding-right: 1rem;
+    }
+
+    .mitre-stats {
+        flex-wrap: wrap;
+        gap: 0.5rem;
     }
 
     .grid {
