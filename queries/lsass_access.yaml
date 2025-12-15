@@ -1,7 +1,6 @@
 name: "LSASS Memory Access Detection"
 author: "Leon Schulze"
 description: "Detects attempts to access LSASS process memory, which is commonly used by credential dumping tools like Mimikatz to extract passwords and hashes from memory."
-severity: "Critical"
 content_type: bioc
 category: "Credential Theft"
 tags:
