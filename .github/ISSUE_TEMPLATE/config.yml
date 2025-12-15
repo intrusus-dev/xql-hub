@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 Discussions
+    url: https://github.com/intrusus-dev/xql-hub/discussions
+    about: Ask questions and discuss ideas
+  - name: 📖 Documentation
+    url: https://xql-hub.com/docs
+    about: Read the documentation
+  - name: 🌐 XQL Hub Website
+    url: https://xql-hub.com
+    about: Browse and search queries

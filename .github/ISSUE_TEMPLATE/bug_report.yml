@@ -1,0 +1,54 @@
+name: 🐛 Bug Report
+description: Report a bug with the XQL Hub website or a query
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: dropdown
+    id: bug-type
+    attributes:
+      label: Bug Type
+      options:
+        - Website/UI Issue
+        - Query Error
+        - False Positive in Query
+        - Documentation Error
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear description of the bug
+      placeholder: What happened? What did you expect to happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to Reproduce
+      description: How can we reproduce this issue?
+      placeholder: |
+        1. Go to '...'
+        2. Click on '...'
+        3. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Your environment details (if applicable)
+      placeholder: |
+        - Browser: Chrome 120
+        - Cortex Version: X.X.X
+        - OS: Windows 11
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs/Screenshots
+      description: Add any relevant logs or screenshots

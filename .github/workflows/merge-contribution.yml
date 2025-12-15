@@ -6,13 +6,26 @@ on:
 
 jobs:
   create-pr:
-    if: github.event.label.name == 'approved'
+    if: github.event.label.name == 'status: approved'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
 
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install pyyaml
+
       - name: Extract YAML and Create File
+        id: extract
         run: |
           python << 'EOF'
           import yaml
@@ -20,30 +33,98 @@ jobs:
           import os
           
           issue_body = """${{ github.event.issue.body }}"""
+          
+          # Extract YAML from code block
           yaml_match = re.search(r'```ya?ml\s*(.*?)\s*```', issue_body, re.DOTALL)
-          yaml_content = yaml_match.group(1)
+          yaml_content = yaml_match.group(1).strip()
           data = yaml.safe_load(yaml_content)
           
-          filename = re.sub(r'[^a-z0-9]+', '_', data['name'].lower()).strip('_')
-          filepath = f"queries/{filename}.yaml"
+          # Generate filename
+          name = data.get('name', 'unnamed')
+          filename = re.sub(r'[^a-z0-9]+', '_', name.lower()).strip('_')
           
+          # Determine subdirectory based on content_type
+          content_type = data.get('content_type', 'hunting')
+          subdir_map = {
+              'hunting': 'hunting',
+              'bioc': 'bioc',
+              'correlation': 'correlation',
+              'hygiene': 'hygiene',
+              'widget': 'widgets'
+          }
+          subdir = subdir_map.get(content_type, '')
+          
+          # Create directory if needed
+          if subdir:
+              os.makedirs(f"queries/{subdir}", exist_ok=True)
+              filepath = f"queries/{subdir}/{filename}.yaml"
+          else:
+              filepath = f"queries/{filename}.yaml"
+          
+          # Add created date if not present
+          if 'created' not in data:
+              from datetime import date
+              data['created'] = date.today().isoformat()
+          
+          # Write file with proper formatting
           with open(filepath, 'w') as f:
-              f.write(yaml_content)
+              yaml.dump(data, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
           
-          with open(os.environ['GITHUB_ENV'], 'a') as f:
-              f.write(f"QUERY_FILE={filepath}\n")
-              f.write(f"QUERY_NAME={data['name']}\n")
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write(f"filepath={filepath}\n")
+              f.write(f"filename={filename}\n")
+              f.write(f"query_name={data['name']}\n")
+              f.write(f"author={data.get('author', 'Unknown')}\n")
+              f.write(f"content_type={content_type}\n")
+          
+          print(f"Created: {filepath}")
           EOF
 
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v6
+        id: cpr
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "Add: ${{ env.QUERY_NAME }}"
-          title: "Add: ${{ env.QUERY_NAME }}"
+          commit-message: "Add: ${{ steps.extract.outputs.query_name }}"
+          title: "Add: ${{ steps.extract.outputs.query_name }}"
           body: |
+            ## New Query Contribution
+            
+            **Query Name:** ${{ steps.extract.outputs.query_name }}
+            **Author:** ${{ steps.extract.outputs.author }}
+            **Type:** ${{ steps.extract.outputs.content_type }}
+            **File:** `${{ steps.extract.outputs.filepath }}`
+            
+            ---
+            
             Auto-generated PR from issue #${{ github.event.issue.number }}
             
             Closes #${{ github.event.issue.number }}
+            
+            ---
+            
+            ### Checklist for Maintainers
+            - [ ] Query has been reviewed
+            - [ ] MITRE mappings are correct
+            - [ ] No sensitive data present
+            - [ ] Query follows naming conventions
           branch: contribution-${{ github.event.issue.number }}
           labels: contribution
+
+      - name: Comment on issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `🚀 **Pull Request Created!**
+            
+            Your contribution has been approved and a PR has been created:
+            
+            **PR:** #${{ steps.cpr.outputs.pull-request-number }}
+            **File:** \`${{ steps.extract.outputs.filepath }}\`
+            
+            The PR will be merged by a maintainer shortly. Thank you for your contribution! 🎉`
+            });

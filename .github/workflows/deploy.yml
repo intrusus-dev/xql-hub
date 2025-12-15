@@ -1,0 +1,79 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Update MITRE data
+        run: python tools/update_mitre.py
+
+      - name: Run validation
+        run: |
+          python << 'EOF'
+          # Quick validation before deploy
+          import yaml
+          import os
+          
+          for root, dirs, files in os.walk('queries'):
+              for f in files:
+                  if f.endswith(('.yaml', '.yml')):
+                      with open(os.path.join(root, f)) as fp:
+                          yaml.safe_load(fp)
+          print("✅ All files valid")
+          EOF
+
+      # Option 1: Deploy to your own server via SSH
+      - name: Deploy to Server
+        if: false  # Enable when ready
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            cd /var/www/xql-hub
+            git pull origin main
+            pip install -r requirements.txt
+            sudo systemctl restart xql-hub
+
+      # Option 2: Deploy to Vercel
+      - name: Deploy to Vercel
+        if: false  # Enable when ready
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          vercel-args: '--prod'
+
+      # Option 3: Deploy to Railway
+      - name: Deploy to Railway
+        if: false  # Enable when ready
+        uses: bervProject/railway-deploy@main
+        with:
+          railway_token: ${{ secrets.RAILWAY_TOKEN }}
+          service: xql-hub
+
+      # Option 4: Build and push Docker image
+      - name: Build and Push Docker
+        if: false  # Enable when ready
+        run: |
+          docker build -t xql-hub:latest .
+          # Push to your registry
