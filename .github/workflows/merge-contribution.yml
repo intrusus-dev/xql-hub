@@ -1,0 +1,49 @@
+name: Merge Approved Contribution
+
+on:
+  issues:
+    types: [labeled]
+
+jobs:
+  create-pr:
+    if: github.event.label.name == 'approved'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract YAML and Create File
+        run: |
+          python << 'EOF'
+          import yaml
+          import re
+          import os
+          
+          issue_body = """${{ github.event.issue.body }}"""
+          yaml_match = re.search(r'```ya?ml\s*(.*?)\s*```', issue_body, re.DOTALL)
+          yaml_content = yaml_match.group(1)
+          data = yaml.safe_load(yaml_content)
+          
+          filename = re.sub(r'[^a-z0-9]+', '_', data['name'].lower()).strip('_')
+          filepath = f"queries/{filename}.yaml"
+          
+          with open(filepath, 'w') as f:
+              f.write(yaml_content)
+          
+          with open(os.environ['GITHUB_ENV'], 'a') as f:
+              f.write(f"QUERY_FILE={filepath}\n")
+              f.write(f"QUERY_NAME={data['name']}\n")
+          EOF
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "Add: ${{ env.QUERY_NAME }}"
+          title: "Add: ${{ env.QUERY_NAME }}"
+          body: |
+            Auto-generated PR from issue #${{ github.event.issue.number }}
+            
+            Closes #${{ github.event.issue.number }}
+          branch: contribution-${{ github.event.issue.number }}
+          labels: contribution

@@ -10,6 +10,8 @@
             <span class="badge bioc">BIOC</span>
             {% elif query.content_type == 'correlation' %}
             <span class="badge correlation">CORRELATION</span>
+            {% elif query.content_type == 'widget' %}
+            <span class="badge widget">WIDGET</span>
             {% else %}
             <span class="badge {{ query.content_type }}">{{ query.content_type|upper }}</span>
             {% endif %}

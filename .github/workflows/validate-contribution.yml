@@ -1,0 +1,116 @@
+name: Validate Contribution
+
+on:
+  issues:
+    types: [opened, edited]
+
+jobs:
+  validate:
+    if: contains(github.event.issue.labels.*.name, 'contribution')
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install pyyaml
+
+      - name: Extract and Validate YAML
+        id: validate
+        run: |
+          python << 'EOF'
+          import yaml
+          import re
+          import sys
+          
+          issue_body = """${{ github.event.issue.body }}"""
+          
+          # Extract YAML from code block
+          yaml_match = re.search(r'```ya?ml\s*(.*?)\s*```', issue_body, re.DOTALL)
+          if not yaml_match:
+              print("::error::No YAML code block found in issue")
+              sys.exit(1)
+          
+          yaml_content = yaml_match.group(1)
+          
+          try:
+              data = yaml.safe_load(yaml_content)
+          except yaml.YAMLError as e:
+              print(f"::error::Invalid YAML syntax: {e}")
+              sys.exit(1)
+          
+          # Required fields
+          required = ['name', 'author', 'description', 'content_type', 'query']
+          missing = [f for f in required if f not in data or not data[f]]
+          
+          if missing:
+              print(f"::error::Missing required fields: {', '.join(missing)}")
+              sys.exit(1)
+          
+          # Validate content_type
+          valid_types = ['bioc', 'correlation', 'hunting', 'hygiene', 'widget']
+          if data['content_type'] not in valid_types:
+              print(f"::error::Invalid content_type. Must be one of: {valid_types}")
+              sys.exit(1)
+          
+          # BIOC-specific validation
+          if data['content_type'] == 'bioc':
+              query = data.get('query', '').lower()
+              if 'xdr_data' not in query and 'cloud_audit_log' not in query:
+                  print("::warning::BIOC should use xdr_data or cloud_audit_log dataset")
+              
+              mitre_ids = data.get('mitre_ids', [])
+              if len(mitre_ids) > 3:
+                  print("::error::BIOC rules support max 3 MITRE techniques")
+                  sys.exit(1)
+          
+          # Generate filename
+          filename = re.sub(r'[^a-z0-9]+', '_', data['name'].lower()).strip('_')
+          print(f"filename={filename}" )
+          print(f"content_type={data['content_type']}")
+          print("::notice::Validation passed!")
+          
+          EOF
+
+      - name: Add validated label
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              labels: ['validated']
+            });
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: '✅ **Validation Passed!**\n\nYour contribution has been validated and is ready for maintainer review.'
+            });
+
+      - name: Report validation failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              labels: ['needs-changes']
+            });
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: '❌ **Validation Failed**\n\nPlease check the workflow logs and fix the issues mentioned above.'
+            });

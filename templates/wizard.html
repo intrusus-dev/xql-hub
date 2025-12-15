@@ -1,0 +1,1766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contribute - XSIAM Hub</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/wizard.css">
+</head>
+<body>
+
+    <header>
+        <a href="/" class="logo">XSIAM <span>HUB</span></a>
+        <div class="header-controls">
+            <span class="header-title">Contribution Wizard</span>
+        </div>
+        <button class="wizard-close-btn" onclick="confirmClose()" title="Close wizard">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+        </button>
+    </header>
+
+    <!-- Close Confirmation Modal -->
+    <div class="modal-overlay" id="close-modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-icon">⚠️</div>
+            <h3>Discard changes?</h3>
+            <p>You have unsaved changes. Are you sure you want to close the wizard?</p>
+            <div class="modal-actions">
+                <button class="btn-secondary" onclick="hideCloseModal()">Continue Editing</button>
+                <button class="btn-danger" onclick="closeWizard()">Discard & Close</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="wizard-container">
+        <!-- Progress Bar -->
+        <div class="wizard-progress">
+            <div class="progress-step active" data-step="1">
+                <div class="step-number">1</div>
+                <div class="step-label">Content Type</div>
+            </div>
+            <div class="progress-line"></div>
+            <div class="progress-step" data-step="2">
+                <div class="step-number">2</div>
+                <div class="step-label">Details</div>
+            </div>
+            <div class="progress-line"></div>
+            <div class="progress-step" data-step="3">
+                <div class="step-number">3</div>
+                <div class="step-label">Query</div>
+            </div>
+            <div class="progress-line"></div>
+            <div class="progress-step" data-step="4">
+                <div class="step-number">4</div>
+                <div class="step-label">Review</div>
+            </div>
+        </div>
+
+        <!-- Wizard Steps -->
+        <div class="wizard-content">
+
+            <!-- Step 1: Content Type Selection -->
+            <div class="wizard-step active" data-step="1">
+                <div class="step-header">
+                    <h2>What type of content do you want to contribute?</h2>
+                    <p>Select the type of query or rule you'd like to share with the community.</p>
+                </div>
+
+                <div class="content-type-grid">
+                    <div class="content-type-card" data-type="hunting">
+                        <div class="type-icon">🎯</div>
+                        <h3>Threat Hunting Query</h3>
+                        <p>XQL queries for proactive threat hunting. These are standalone queries that security analysts can run to look for suspicious activity.</p>
+                        <ul class="type-features">
+                            <li>Any XQL dataset</li>
+                            <li>No scheduling needed</li>
+                            <li>Manual execution</li>
+                        </ul>
+                    </div>
+
+                    <div class="content-type-card" data-type="bioc">
+                        <div class="type-icon">🛡️</div>
+                        <h3>BIOC Rule</h3>
+                        <p>Behavioral Indicator of Compromise rules for real-time detection. These rules trigger alerts when specific behaviors are observed.</p>
+                        <ul class="type-features">
+                            <li>xdr_data or cloud_audit_log only</li>
+                            <li>Must filter on event_type</li>
+                            <li>Real-time detection</li>
+                        </ul>
+                    </div>
+
+                    <div class="content-type-card" data-type="correlation">
+                        <div class="type-icon">🔗</div>
+                        <h3>Correlation Rule</h3>
+                        <p>Scheduled rules that correlate events over time to detect complex attack patterns and generate alerts.</p>
+                        <ul class="type-features">
+                            <li>Any XQL dataset</li>
+                            <li>Scheduled execution</li>
+                            <li>Aggregations allowed</li>
+                        </ul>
+                    </div>
+
+                    <div class="content-type-card" data-type="hygiene">
+                        <div class="type-icon">🧹</div>
+                        <h3>IT Hygiene Query</h3>
+                        <p>Queries for security posture assessment, compliance checking, and infrastructure health monitoring.</p>
+                        <ul class="type-features">
+                            <li>Any XQL dataset</li>
+                            <li>Operational focus</li>
+                            <li>Compliance & health</li>
+                        </ul>
+                    </div>
+
+                    <div class="content-type-card" data-type="widget">
+                        <div class="type-icon">📊</div>
+                        <h3>Dashboard Widget</h3>
+                        <p>XQL queries with visualization for dashboards. Includes charts, graphs, tables, and gauges.</p>
+                        <ul class="type-features">
+                            <li>Any XQL dataset</li>
+                            <li>Includes | view graph</li>
+                            <li>Dashboard-ready</li>
+                        </ul>
+                    </div>
+
+                    <div class="content-type-card" data-type="import">
+                        <div class="type-icon">📁</div>
+                        <h3>Import Existing</h3>
+                        <p>Upload an exported BIOC (.bioc) or Correlation Rule (.json) file directly from Cortex XSIAM/XDR.</p>
+                        <ul class="type-features">
+                            <li>BIOC export files</li>
+                            <li>Correlation JSON files</li>
+                            <li>Auto-parse fields</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 2: Details (Dynamic based on type) -->
+            <div class="wizard-step" data-step="2">
+                <div class="step-header">
+                    <h2>Enter the details</h2>
+                    <p id="step2-description">Fill in the required information for your contribution.</p>
+                </div>
+
+                <!-- Import Section (shown when import type selected) -->
+                <div class="import-section" id="import-section" style="display: none;">
+                    <div class="import-dropzone" id="import-dropzone">
+                        <div class="dropzone-icon">📁</div>
+                        <h3>Drop your file here</h3>
+                        <p>or click to browse</p>
+                        <p class="dropzone-hint">Accepts .bioc and .json files exported from Cortex XSIAM/XDR</p>
+                        <input type="file" id="file-input" accept=".bioc,.json" style="display: none;">
+                    </div>
+                    <div class="import-preview" id="import-preview" style="display: none;">
+                        <div class="preview-header">
+                            <span class="preview-icon">✅</span>
+                            <span class="preview-filename" id="preview-filename"></span>
+                            <button type="button" class="preview-remove" onclick="clearImport()">×</button>
+                        </div>
+                        <div class="preview-details" id="preview-details"></div>
+                    </div>
+                </div>
+
+                <!-- Form Fields Section -->
+                <div class="form-section" id="form-section">
+                    <form id="details-form">
+                        <div class="form-row">
+                            <div class="form-group full-width">
+                                <label for="query-name">Name <span class="required">*</span></label>
+                                <input type="text" id="query-name" name="name" required
+                                       placeholder="e.g., Suspicious PowerShell Execution Detection">
+                                <span class="form-hint">A clear, descriptive name for your query</span>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group full-width">
+                                <label for="query-description">Description <span class="required">*</span></label>
+                                <textarea id="query-description" name="description" rows="3" required
+                                          placeholder="Describe what this query detects and why it's useful..."></textarea>
+                                <span class="form-hint">Explain the purpose and use case of this query</span>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="author-name">Author Name <span class="required">*</span></label>
+                                <input type="text" id="author-name" name="author" required
+                                       placeholder="Your name or handle">
+                            </div>
+                            <div class="form-group">
+                                <label for="author-github">GitHub Username (optional)</label>
+                                <input type="text" id="author-github" name="github"
+                                       placeholder="@username">
+                            </div>
+                        </div>
+
+                        <!-- Severity (for BIOC and Correlation) -->
+                        <div class="form-row" id="severity-row">
+                            <div class="form-group">
+                                <label for="severity">Severity <span class="required">*</span></label>
+                                <select id="severity" name="severity">
+                                    <option value="">Select severity...</option>
+                                    <option value="informational">Informational</option>
+                                    <option value="low">Low</option>
+                                    <option value="medium">Medium</option>
+                                    <option value="high">High</option>
+                                    <option value="critical">Critical</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- BIOC-specific fields -->
+                        <div class="form-row bioc-fields" style="display: none;">
+                            <div class="form-group">
+                                <label for="bioc-category">BIOC Category <span class="required">*</span></label>
+                                <select id="bioc-category" name="bioc_category">
+                                    <option value="">Select category...</option>
+                                    <option value="collection">Collection</option>
+                                    <option value="credential_access">Credentials Access</option>
+                                    <option value="discovery">Discovery</option>
+                                    <option value="dropper">Dropper</option>
+                                    <option value="evasion">Evasion</option>
+                                    <option value="execution">Execution</option>
+                                    <option value="exfiltration">Exfiltration</option>
+                                    <option value="file_priv_esc">File Privileges Escalation</option>
+                                    <option value="file_obfuscation">File Type Obfuscation</option>
+                                    <option value="infiltration">Infiltration</option>
+                                    <option value="lateral_movement">Lateral Movement</option>
+                                    <option value="persistence">Persistence</option>
+                                    <option value="priv_esc">Privileges Escalation</option>
+                                    <option value="reconnaissance">Reconnaissance</option>
+                                    <option value="tampering">Tampering</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="bioc-event-type">Event Type <span class="required">*</span></label>
+                                <select id="bioc-event-type" name="event_type">
+                                    <option value="">Select event type...</option>
+                                    <option value="PROCESS">PROCESS</option>
+                                    <option value="FILE">FILE</option>
+                                    <option value="NETWORK">NETWORK</option>
+                                    <option value="REGISTRY">REGISTRY</option>
+                                    <option value="INJECTION">INJECTION</option>
+                                    <option value="LOAD_IMAGE">LOAD_IMAGE</option>
+                                    <option value="STORY">STORY</option>
+                                    <option value="EVENT_LOG">EVENT_LOG</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Correlation-specific fields -->
+                        <div class="form-row correlation-fields" style="display: none;">
+                            <div class="form-group">
+                                <label for="corr-schedule">Schedule</label>
+                                <select id="corr-schedule" name="schedule">
+                                    <option value="10m">Every 10 minutes</option>
+                                    <option value="20m">Every 20 minutes</option>
+                                    <option value="30m">Every 30 minutes</option>
+                                    <option value="1h">Hourly</option>
+                                    <option value="1d">Daily</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="corr-timeframe">Query Time Frame</label>
+                                <select id="corr-timeframe" name="timeframe">
+                                    <option value="15m">15 minutes</option>
+                                    <option value="30m">30 minutes</option>
+                                    <option value="1h" selected>1 hour</option>
+                                    <option value="4h">4 hours</option>
+                                    <option value="12h">12 hours</option>
+                                    <option value="24h">24 hours</option>
+                                    <option value="7d">7 days</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-row correlation-fields" style="display: none;">
+                            <div class="form-group full-width">
+                                <label for="alert-name">Alert Name Template</label>
+                                <input type="text" id="alert-name" name="alert_name"
+                                       placeholder="e.g., Brute force detected from $source_ip">
+                                <span class="form-hint">Use $field_name for dynamic values</span>
+                            </div>
+                        </div>
+
+                        <!-- Log Sources -->
+                        <div class="form-row">
+                            <div class="form-group full-width">
+                                <label>Log Sources <span class="required">*</span></label>
+                                <div class="checkbox-grid" id="log-sources-grid">
+                                    <label class="checkbox-item">
+                                        <input type="checkbox" name="log_sources" value="Cortex XDR Agent">
+                                        <span>Cortex XDR Agent</span>
+                                    </label>
+                                    <label class="checkbox-item">
+                                        <input type="checkbox" name="log_sources" value="Windows Event Logs">
+                                        <span>Windows Event Logs</span>
+                                    </label>
+                                    <label class="checkbox-item">
+                                        <input type="checkbox" name="log_sources" value="Cloud Audit Logs">
+                                        <span>Cloud Audit Logs</span>
+                                    </label>
+                                    <label class="checkbox-item">
+                                        <input type="checkbox" name="log_sources" value="Network Logs">
+                                        <span>Network Logs</span>
+                                    </label>
+                                    <label class="checkbox-item">
+                                        <input type="checkbox" name="log_sources" value="Identity Logs">
+                                        <span>Identity Logs</span>
+                                    </label>
+                                    <label class="checkbox-item">
+                                        <input type="checkbox" name="log_sources" value="Firewall Logs">
+                                        <span>Firewall Logs</span>
+                                    </label>
+                                    <label class="checkbox-item">
+                                        <input type="checkbox" name="log_sources" value="Linux Audit Logs">
+                                        <span>Linux Audit Logs</span>
+                                    </label>
+                                    <label class="checkbox-item">
+                                        <input type="checkbox" name="log_sources" value="macOS Logs">
+                                        <span>macOS Logs</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Tags -->
+                        <div class="form-row">
+                            <div class="form-group full-width">
+                                <label for="tags">Tags</label>
+                                <div class="tags-input-container">
+                                    <div class="tags-list" id="tags-list"></div>
+                                    <input type="text" id="tags-input" placeholder="Type and press Enter to add tags">
+                                </div>
+                                <span class="form-hint">Add relevant tags to help others find your query</span>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Step 3: Query & MITRE Mapping -->
+            <div class="wizard-step" data-step="3">
+                <div class="step-header">
+                    <h2>XQL Query & MITRE ATT&CK Mapping</h2>
+                    <p>Enter your XQL query and map it to relevant MITRE ATT&CK techniques.</p>
+                </div>
+
+                <div class="query-section">
+                    <div class="form-group">
+                        <label for="xql-query">XQL Query <span class="required">*</span></label>
+                        <div class="query-editor-container">
+                            <div class="query-toolbar">
+                                <button type="button" class="toolbar-btn" onclick="formatQuery()">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <line x1="21" y1="10" x2="3" y2="10"></line>
+                                        <line x1="21" y1="6" x2="3" y2="6"></line>
+                                        <line x1="21" y1="14" x2="3" y2="14"></line>
+                                        <line x1="21" y1="18" x2="3" y2="18"></line>
+                                    </svg>
+                                    Format
+                                </button>
+                                <button type="button" class="toolbar-btn" onclick="validateQuery()">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="20 6 9 17 4 12"></polyline>
+                                    </svg>
+                                    Validate
+                                </button>
+                            </div>
+                            <textarea id="xql-query" name="query" rows="12"
+                                      placeholder="dataset = xdr_data
+| filter event_type = PROCESS
+| filter action_process_image_name ~= &quot;powershell&quot;
+| fields _time, agent_hostname, action_process_command_line"></textarea>
+                        </div>
+                        <div class="query-validation" id="query-validation"></div>
+                    </div>
+                </div>
+
+                <!-- MITRE ATT&CK Mapping -->
+                <div class="mitre-mapping-section">
+                    <h3>MITRE ATT&CK Mapping</h3>
+                    <p class="section-hint" id="mitre-hint">Select up to 3 tactics and techniques that best describe this detection.</p>
+
+                    <div class="mitre-selection">
+                        <div class="mitre-column">
+                            <label>Tactics</label>
+                            <div class="mitre-list" id="tactic-list">
+                                {% for tactic in tactics %}
+                                <label class="mitre-item">
+                                    <input type="checkbox" name="tactics" value="{{ tactic.id }}"
+                                           onchange="onTacticChange(this)">
+                                    <span class="mitre-id">{{ tactic.id }}</span>
+                                    <span class="mitre-name">{{ tactic.name }}</span>
+                                </label>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <div class="mitre-column">
+                            <label>Techniques <span id="technique-filter-label"></span></label>
+                            <input type="text" id="technique-search" class="technique-search"
+                                   placeholder="Search techniques..." oninput="filterTechniques()">
+                            <div class="mitre-list" id="technique-list">
+                                <!-- Populated dynamically -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="selected-mitre" id="selected-mitre">
+                        <label>Selected Mappings:</label>
+                        <div class="selected-mitre-tags" id="selected-mitre-tags">
+                            <span class="empty-selection">No techniques selected</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 4: Review & Submit -->
+            <div class="wizard-step" data-step="4">
+                <div class="step-header">
+                    <h2>Review & Submit</h2>
+                    <p>Review your contribution before submitting.</p>
+                </div>
+
+                <div class="review-section">
+                    <div class="review-card">
+                        <div class="review-header">
+                            <span class="review-type-badge" id="review-type-badge">HUNTING</span>
+                            <h3 id="review-name">Query Name</h3>
+                        </div>
+
+                        <div class="review-meta">
+                            <span class="review-author" id="review-author">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                                    <circle cx="12" cy="7" r="4"></circle>
+                                </svg>
+                                Author Name
+                            </span>
+                            <span class="review-severity" id="review-severity" style="display: none;">
+                                Severity: <strong>Medium</strong>
+                            </span>
+                        </div>
+
+                        <div class="review-description" id="review-description">
+                            Description will appear here...
+                        </div>
+
+                        <div class="review-mitre" id="review-mitre">
+                            <!-- MITRE tags will be populated -->
+                        </div>
+
+                        <div class="review-tags" id="review-tags">
+                            <!-- Tags will be populated -->
+                        </div>
+
+                        <div class="review-query">
+                            <pre><code id="review-query-code"></code></pre>
+                        </div>
+                    </div>
+
+                    <!-- Generated YAML Preview -->
+                    <div class="yaml-preview">
+                        <div class="yaml-header">
+                            <h4>Generated YAML</h4>
+                            <button type="button" class="copy-yaml-btn" onclick="copyYaml()">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                </svg>
+                                Copy YAML
+                            </button>
+                        </div>
+                        <pre><code id="yaml-output"></code></pre>
+                    </div>
+
+                    <!-- Submission Options -->
+                    <div class="submission-options">
+                        <h4>How would you like to contribute?</h4>
+
+                        <div class="submission-grid">
+                            <div class="submission-option" onclick="selectSubmission('download')">
+                                <input type="radio" name="submission" value="download" checked>
+                                <div class="option-content">
+                                    <div class="option-icon">📥</div>
+                                    <h5>Download YAML</h5>
+                                    <p>Download the YAML file and submit it via GitHub Pull Request yourself.</p>
+                                </div>
+                            </div>
+
+                            <div class="submission-option" onclick="selectSubmission('github')">
+                                <input type="radio" name="submission" value="github">
+                                <div class="option-content">
+                                    <div class="option-icon">🐙</div>
+                                    <h5>Create GitHub Issue</h5>
+                                    <p>We'll create a GitHub issue with your query for the maintainers to review.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Success Screen -->
+            <div class="wizard-step" data-step="success" id="success-screen" style="display: none;">
+                <div class="success-content">
+                    <div class="success-icon">🎉</div>
+                    <h2>Contribution Submitted!</h2>
+                    <p class="success-message" id="success-message">Thank you for contributing to XSIAM Hub!</p>
+
+                    <div class="success-details" id="success-details">
+                        <!-- Will be populated based on submission method -->
+                    </div>
+
+                    <div class="success-actions">
+                        <button type="button" class="btn btn-secondary" onclick="resetWizard()">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="1 4 1 10 7 10"></polyline>
+                                <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                            </svg>
+                            Submit Another
+                        </button>
+                        <button type="button" class="btn btn-primary" onclick="closeWizard()">
+                            Done
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Navigation Buttons -->
+        <div class="wizard-navigation">
+            <button type="button" class="btn btn-secondary" id="prev-btn" onclick="previousStep()" style="display: none;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="19" y1="12" x2="5" y2="12"></line>
+                    <polyline points="12 19 5 12 12 5"></polyline>
+                </svg>
+                Previous
+            </button>
+            <button type="button" class="btn btn-primary" id="next-btn" onclick="nextStep()" disabled>
+                Next
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                    <polyline points="12 5 19 12 12 19"></polyline>
+                </svg>
+            </button>
+            <button type="button" class="btn btn-success" id="submit-btn" onclick="submitContribution()" style="display: none;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                Submit Contribution
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // MITRE data from backend
+        const mitreData = {{ mitre_data | tojson | safe }};
+        const tactics = {{ tactics | tojson | safe }};
+
+        // Wizard state
+        let currentStep = 1;
+        let selectedType = null;
+        let selectedTactics = [];
+        let selectedTechniques = [];
+        let tags = [];
+        let importedData = null;
+        let submissionMethod = 'download';
+
+        // BIOC type limits
+        const BIOC_MAX_TACTICS = 3;
+        const BIOC_MAX_TECHNIQUES = 3;
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeWizard();
+            setupEventListeners();
+            populateTechniqueList();
+        });
+
+        function initializeWizard() {
+            updateNavigationButtons();
+        }
+
+        function setupEventListeners() {
+            // Content type selection
+            document.querySelectorAll('.content-type-card').forEach(card => {
+                card.addEventListener('click', () => selectContentType(card.dataset.type));
+            });
+
+            // Tags input
+            const tagsInput = document.getElementById('tags-input');
+            tagsInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    addTag(tagsInput.value.trim());
+                    tagsInput.value = '';
+                }
+            });
+
+            // File import
+            const dropzone = document.getElementById('import-dropzone');
+            const fileInput = document.getElementById('file-input');
+
+            dropzone.addEventListener('click', () => fileInput.click());
+            dropzone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropzone.classList.add('dragover');
+            });
+            dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+            dropzone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropzone.classList.remove('dragover');
+                handleFileImport(e.dataTransfer.files[0]);
+            });
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files[0]) handleFileImport(e.target.files[0]);
+            });
+        }
+
+        function selectContentType(type) {
+            selectedType = type;
+            document.querySelectorAll('.content-type-card').forEach(c => c.classList.remove('selected'));
+            document.querySelector(`[data-type="${type}"]`).classList.add('selected');
+            document.getElementById('next-btn').disabled = false;
+
+            // Update form visibility based on type
+            updateFormForType(type);
+        }
+
+        function updateFormForType(type) {
+            const severityRow = document.getElementById('severity-row');
+            const biocFields = document.querySelectorAll('.bioc-fields');
+            const corrFields = document.querySelectorAll('.correlation-fields');
+            const importSection = document.getElementById('import-section');
+            const formSection = document.getElementById('form-section');
+            const mitreHint = document.getElementById('mitre-hint');
+
+            // Reset all
+            severityRow.style.display = 'none';
+            biocFields.forEach(f => f.style.display = 'none');
+            corrFields.forEach(f => f.style.display = 'none');
+            importSection.style.display = 'none';
+            formSection.style.display = 'block';
+
+            switch(type) {
+                case 'bioc':
+                    severityRow.style.display = 'flex';
+                    biocFields.forEach(f => f.style.display = 'flex');
+                    mitreHint.textContent = 'BIOC rules support up to 3 tactics and 3 techniques.';
+                    break;
+                case 'correlation':
+                    severityRow.style.display = 'flex';
+                    corrFields.forEach(f => f.style.display = 'flex');
+                    mitreHint.textContent = 'Map your correlation rule to relevant MITRE ATT&CK techniques.';
+                    break;
+                case 'import':
+                    importSection.style.display = 'block';
+                    formSection.style.display = 'none';
+                    break;
+                case 'hunting':
+                case 'hygiene':
+                case 'widget':
+                    mitreHint.textContent = 'Select the MITRE ATT&CK techniques that best describe this query.';
+                    break;
+            }
+        }
+
+        function handleFileImport(file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    let content = e.target.result;
+                    let parsed;
+
+                    if (file.name.endsWith('.bioc')) {
+                        // BIOC files have MD5 hash on first line
+                        const lines = content.split('\n');
+                        content = lines.slice(1).join('\n');
+                        parsed = JSON.parse(content);
+                        if (Array.isArray(parsed)) parsed = parsed[0];
+                        importedData = { type: 'bioc', data: parsed };
+                        selectedType = 'bioc';
+                    } else {
+                        parsed = JSON.parse(content);
+                        if (Array.isArray(parsed)) parsed = parsed[0];
+                        importedData = { type: 'correlation', data: parsed };
+                        selectedType = 'correlation';
+                    }
+
+                    showImportPreview(file.name, importedData);
+                    populateFromImport(importedData);
+
+                } catch (err) {
+                    alert('Error parsing file: ' + err.message);
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function showImportPreview(filename, data) {
+            document.getElementById('import-dropzone').style.display = 'none';
+            document.getElementById('import-preview').style.display = 'block';
+            document.getElementById('preview-filename').textContent = filename;
+
+            const details = document.getElementById('preview-details');
+            const d = data.data;
+
+            // Format severity for display
+            const severityMap = {
+                'SEV_010_INFORMATIONAL': 'Informational',
+                'SEV_020_LOW': 'Low',
+                'SEV_030_MEDIUM': 'Medium',
+                'SEV_040_HIGH': 'High',
+                'SEV_050_CRITICAL': 'Critical'
+            };
+            const severityDisplay = severityMap[d.severity] || d.severity || 'N/A';
+
+            let html = `
+                <div class="preview-item"><strong>Name:</strong> ${d.name || 'N/A'}</div>
+                <div class="preview-item"><strong>Type:</strong> ${data.type.toUpperCase()}</div>
+                <div class="preview-item"><strong>Severity:</strong> ${severityDisplay}</div>
+            `;
+
+            // BIOC-specific preview info
+            if (data.type === 'bioc') {
+                if (d.category) {
+                    html += `<div class="preview-item"><strong>Category:</strong> ${d.category}</div>`;
+                }
+                if (d.mitre_technique_id) {
+                    html += `<div class="preview-item"><strong>MITRE:</strong> ${d.mitre_technique_id}</div>`;
+                }
+                if (d.indicator?.investigationType) {
+                    const eventTypeMap = {
+                        'PROCESS_EXECUTION_EVENT': 'Process',
+                        'FILE_EVENT': 'File',
+                        'NETWORK_EVENT': 'Network',
+                        'REGISTRY_EVENT': 'Registry',
+                        'LOAD_IMAGE_EVENT': 'Image Load',
+                        'EVENT_LOG_EVENT': 'Event Log',
+                        'NETWORK_CONNECTION_EVENT': 'Network Connections'
+                    };
+                    html += `<div class="preview-item"><strong>Event Type:</strong> ${eventTypeMap[d.indicator.investigationType] || d.indicator.investigationType}</div>`;
+                }
+
+                // Show warning for Query Builder BIOCs
+                if (!d.is_xql) {
+                    html += `
+                        <div class="preview-warning">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                                <line x1="12" y1="9" x2="12" y2="13"></line>
+                                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                            </svg>
+                            <span>This BIOC uses Query Builder mode. An XQL query will be auto-generated - please review it in Step 3.</span>
+                        </div>
+                    `;
+                }
+            }
+
+            details.innerHTML = html;
+            document.getElementById('next-btn').disabled = false;
+        }
+
+        function clearImport() {
+            importedData = null;
+            document.getElementById('import-dropzone').style.display = 'block';
+            document.getElementById('import-preview').style.display = 'none';
+            document.getElementById('file-input').value = '';
+            document.getElementById('next-btn').disabled = true;
+        }
+
+        function populateFromImport(imported) {
+            const d = imported.data;
+
+            // Basic fields
+            document.getElementById('query-name').value = d.name || '';
+            document.getElementById('query-description').value = d.description || d.comment || d.alert_description || d.indicator_text || '';
+
+            // Severity mapping
+            if (d.severity) {
+                const severityMap = {
+                    'SEV_010_INFORMATIONAL': 'informational',
+                    'SEV_020_LOW': 'low',
+                    'SEV_030_MEDIUM': 'medium',
+                    'SEV_040_HIGH': 'high',
+                    'SEV_050_CRITICAL': 'critical'
+                };
+                document.getElementById('severity').value = severityMap[d.severity] || d.severity.toLowerCase();
+            }
+
+            // Handle BIOC-specific fields
+            if (imported.type === 'bioc') {
+                // BIOC Category
+                if (d.category) {
+                    const categoryMap = {
+                        'OTHER': 'other',
+                        'COLLECTION': 'collection',
+                        'CREDENTIAL_ACCESS': 'credential_access',
+                        'CREDENTIALS_ACCESS': 'credential_access',
+                        'DISCOVERY': 'discovery',
+                        'DROPPER': 'dropper',
+                        'EVASION': 'evasion',
+                        'EXECUTION': 'execution',
+                        'EXFILTRATION': 'exfiltration',
+                        'FILE_PRIVILEGES_ESCALATION': 'file_priv_esc',
+                        'FILE_TYPE_OBFUSCATION': 'file_obfuscation',
+                        'INFILTRATION': 'infiltration',
+                        'LATERAL_MOVEMENT': 'lateral_movement',
+                        'PERSISTENCE': 'persistence',
+                        'PRIVILEGES_ESCALATION': 'priv_esc',
+                        'RECONNAISSANCE': 'reconnaissance',
+                        'TAMPERING': 'tampering'
+                    };
+                    const categorySelect = document.getElementById('bioc-category');
+                    if (categorySelect) {
+                        categorySelect.value = categoryMap[d.category] || d.category.toLowerCase();
+                    }
+                }
+
+                // Event Type from investigationType
+                if (d.indicator && d.indicator.investigationType) {
+                    const eventTypeMap = {
+                        'PROCESS_EXECUTION_EVENT': 'PROCESS',
+                        'PROCESS_INJECTION_EVENT': 'INJECTION',
+                        'FILE_EVENT': 'FILE',
+                        'NETWORK_EVENT': 'NETWORK',
+                        'REGISTRY_EVENT': 'REGISTRY',
+                        'LOAD_IMAGE_EVENT': 'LOAD_IMAGE',
+                        'STORY_EVENT': 'STORY',
+                        'EVENT_LOG_EVENT': 'EVENT_LOG',
+                        'NETWORK_CONNECTION_EVENT': 'STORY'
+                    };
+                    const eventTypeSelect = document.getElementById('bioc-event-type');
+                    if (eventTypeSelect) {
+                        eventTypeSelect.value = eventTypeMap[d.indicator.investigationType] || '';
+                    }
+                }
+
+                // XQL Query - handle both XQL mode and Query Builder mode
+                if (d.is_xql && d.xql) {
+                    // XQL mode BIOC
+                    document.getElementById('xql-query').value = d.xql;
+                } else if (!d.is_xql && d.indicator) {
+                    // Query Builder mode - generate XQL approximation
+                    const generatedXql = generateXqlFromIndicator(d.indicator, d.indicator_text);
+                    document.getElementById('xql-query').value = generatedXql;
+                }
+
+                // MITRE mappings from direct fields (BIOC format)
+                if (d.mitre_tactic_id) {
+                    const tacticIds = Array.isArray(d.mitre_tactic_id) ? d.mitre_tactic_id : [d.mitre_tactic_id];
+                    tacticIds.forEach(tacticId => {
+                        if (tacticId && !selectedTactics.includes(tacticId)) {
+                            selectedTactics.push(tacticId);
+                            const tacticCheckbox = document.querySelector(`#tactic-list input[value="${tacticId}"]`);
+                            if (tacticCheckbox) tacticCheckbox.checked = true;
+                        }
+                    });
+                }
+
+                if (d.mitre_technique_id) {
+                    const techIds = Array.isArray(d.mitre_technique_id) ? d.mitre_technique_id : [d.mitre_technique_id];
+                    techIds.forEach(techId => {
+                        if (techId && !selectedTechniques.includes(techId)) {
+                            selectedTechniques.push(techId);
+                        }
+                    });
+                }
+
+                // Also check btp_rule for additional MITRE mappings
+                if (d.btp_rule) {
+                    Object.values(d.btp_rule).forEach(osRule => {
+                        if (osRule.signatureConfiguration?.default?.settings) {
+                            const settings = osRule.signatureConfiguration.default.settings;
+                            if (settings.tactic_id) {
+                                settings.tactic_id.forEach(tid => {
+                                    if (!selectedTactics.includes(tid)) {
+                                        selectedTactics.push(tid);
+                                        const cb = document.querySelector(`#tactic-list input[value="${tid}"]`);
+                                        if (cb) cb.checked = true;
+                                    }
+                                });
+                            }
+                            if (settings.technique_id) {
+                                settings.technique_id.forEach(techId => {
+                                    if (!selectedTechniques.includes(techId)) {
+                                        selectedTechniques.push(techId);
+                                    }
+                                });
+                            }
+                        }
+                    });
+                }
+            }
+
+            // Handle Correlation rule XQL
+            if (imported.type === 'correlation' && d.xql_query) {
+                document.getElementById('xql-query').value = d.xql_query;
+            }
+
+            // MITRE mappings from mitre_defs (Correlation format)
+            if (d.mitre_defs) {
+                Object.entries(d.mitre_defs).forEach(([tactic, techniques]) => {
+                    const tacticId = tactic.split(' - ')[0];
+                    if (!selectedTactics.includes(tacticId)) {
+                        selectedTactics.push(tacticId);
+                        const tacticCheckbox = document.querySelector(`#tactic-list input[value="${tacticId}"]`);
+                        if (tacticCheckbox) tacticCheckbox.checked = true;
+                    }
+
+                    techniques.forEach(tech => {
+                        const techId = tech.split(' - ')[0];
+                        if (!selectedTechniques.includes(techId)) {
+                            selectedTechniques.push(techId);
+                        }
+                    });
+                });
+            }
+
+            // Update displays
+            updateSelectedMitreDisplay();
+            updateTechniqueCheckboxes();
+            filterTechniques();
+
+            // Update form visibility
+            updateFormForType(imported.type);
+            document.getElementById('form-section').style.display = 'block';
+        }
+
+        function generateXqlFromIndicator(indicator, indicatorText) {
+            // Generate an XQL query approximation from a Query Builder BIOC indicator
+
+            // Map investigation types to XQL event_type values
+            const eventTypeMap = {
+                'PROCESS_EXECUTION_EVENT': 'PROCESS',
+                'PROCESS_INJECTION_EVENT': 'INJECTION',
+                'FILE_EVENT': 'FILE',
+                'NETWORK_EVENT': 'NETWORK',
+                'REGISTRY_EVENT': 'REGISTRY',
+                'LOAD_IMAGE_EVENT': 'LOAD_IMAGE',
+                'STORY_EVENT': 'STORY',
+                'EVENT_LOG_EVENT': 'EVENT_LOG',
+                'NETWORK_CONNECTION_EVENT': 'STORY'
+            };
+
+            // Map Query Builder field names to XQL field names
+            const fieldNameMap = {
+                // Process fields
+                'action_process_image_command_line': 'action_process_image_command_line',
+                'action_process_image_name': 'action_process_image_name',
+                'action_process_image_path': 'action_process_image_path',
+                'action_process_image_md5': 'action_process_image_md5',
+                'action_process_image_sha256': 'action_process_image_sha256',
+                'action_process_signature_vendor': 'action_process_signature_vendor',
+                'action_process_signature_product': 'action_process_signature_product',
+                'actor_process_image_name': 'actor_process_image_name',
+                'actor_process_image_path': 'actor_process_image_path',
+                'actor_process_command_line': 'actor_process_command_line',
+                'causality_actor_process_image_name': 'causality_actor_process_image_name',
+                'causality_actor_process_command_line': 'causality_actor_process_command_line',
+                'os_actor_process_image_name': 'os_actor_process_image_name',
+                // File fields
+                'action_file_name': 'action_file_name',
+                'action_file_path': 'action_file_path',
+                'action_file_md5': 'action_file_md5',
+                'action_file_sha256': 'action_file_sha256',
+                'action_file_previous_file_name': 'action_file_previous_file_name',
+                'action_file_previous_file_path': 'action_file_previous_file_path',
+                // Network fields
+                'action_local_ip': 'action_local_ip',
+                'action_local_port': 'action_local_port',
+                'action_remote_ip': 'action_remote_ip',
+                'action_remote_port': 'action_remote_port',
+                'action_external_hostname': 'action_external_hostname',
+                'dst_action_external_hostname': 'dst_action_external_hostname',
+                // Registry fields
+                'action_registry_key_name': 'action_registry_key_name',
+                'action_registry_value_name': 'action_registry_value_name',
+                'action_registry_data': 'action_registry_data',
+                // Event Log fields
+                'action_evtlog_event_id': 'action_evtlog_event_id',
+                'action_evtlog_provider_name': 'action_evtlog_provider_name',
+                'action_evtlog_message': 'action_evtlog_message',
+                // Host fields
+                'agent_hostname': 'agent_hostname',
+                'agent_ip_addresses': 'agent_ip_addresses',
+                'agent_os_type': 'agent_os_type',
+                'agent_os_sub_type': 'agent_os_sub_type'
+            };
+
+            // Map OS type values
+            const osTypeMap = {
+                1: 'AGENT_OS_WINDOWS',
+                2: 'AGENT_OS_MAC',
+                3: 'AGENT_OS_LINUX'
+            };
+
+            const eventType = eventTypeMap[indicator.investigationType] || 'PROCESS';
+            const investigation = indicator.investigation?.[indicator.investigationType];
+
+            let filters = [];
+            let osFilters = [];
+
+            // Process filter conditions recursively
+            function processConditions(filterObj, isNested = false) {
+                if (!filterObj) return;
+
+                // Handle AND conditions
+                if (filterObj.AND) {
+                    filterObj.AND.forEach(condition => {
+                        processConditions(condition, true);
+                    });
+                }
+
+                // Handle OR conditions
+                if (filterObj.OR) {
+                    const orFilters = [];
+                    filterObj.OR.forEach(condition => {
+                        const tempFilters = [];
+                        // Process each OR branch
+                        if (condition.SEARCH_FIELD) {
+                            const filterStr = buildFilterString(condition);
+                            if (filterStr) orFilters.push(filterStr);
+                        }
+                    });
+                    if (orFilters.length > 0) {
+                        filters.push(`(${orFilters.join(' or ')})`);
+                    }
+                }
+
+                // Handle single condition
+                if (filterObj.SEARCH_FIELD) {
+                    const filterStr = buildFilterString(filterObj);
+                    if (filterStr) {
+                        // Check if it's an OS filter
+                        if (filterObj.SEARCH_FIELD === 'agent_os_type') {
+                            osFilters.push(filterStr);
+                        } else {
+                            filters.push(filterStr);
+                        }
+                    }
+                }
+            }
+
+            // Build filter string from condition
+            function buildFilterString(condition) {
+                const field = fieldNameMap[condition.SEARCH_FIELD] || condition.SEARCH_FIELD;
+                let value = condition.SEARCH_VALUE;
+                const searchType = condition.SEARCH_TYPE;
+
+                // Skip certain fields that don't translate well
+                if (condition.node === 'xdr_agent' && condition.SEARCH_FIELD === 'agent_os_type') {
+                    // Handle OS type filter specially
+                    const osName = osTypeMap[value];
+                    if (osName) {
+                        return `agent_os_type = ${osName}`;
+                    }
+                }
+
+                // Skip raw agent_os_type numeric values for now
+                if (condition.SEARCH_FIELD === 'agent_os_type') {
+                    return null;
+                }
+
+                // Escape quotes in string values
+                if (typeof value === 'string') {
+                    value = value.replace(/"/g, '\\"');
+                }
+
+                switch (searchType) {
+                    case 'EQ':
+                        if (typeof value === 'string') {
+                            return `${field} = "${value}"`;
+                        }
+                        return `${field} = ${value}`;
+
+                    case 'NEQ':
+                        if (typeof value === 'string') {
+                            return `${field} != "${value}"`;
+                        }
+                        return `${field} != ${value}`;
+
+                    case 'WILDCARD':
+                        return `${field} ~= "${value}"`;
+
+                    case 'REGEX':
+                        // XQL uses ~= for regex patterns too
+                        return `${field} ~= "${value}"`;
+
+                    case 'CONTAINS':
+                        return `${field} contains "${value}"`;
+
+                    case 'NOT_CONTAINS':
+                        return `${field} not contains "${value}"`;
+
+                    case 'IN':
+                        if (Array.isArray(value)) {
+                            const values = value.map(v => typeof v === 'string' ? `"${v}"` : v).join(', ');
+                            return `${field} in (${values})`;
+                        }
+                        return `${field} in ("${value}")`;
+
+                    case 'NOT_IN':
+                        if (Array.isArray(value)) {
+                            const values = value.map(v => typeof v === 'string' ? `"${v}"` : v).join(', ');
+                            return `${field} not in (${values})`;
+                        }
+                        return `${field} not in ("${value}")`;
+
+                    case 'STARTS_WITH':
+                        return `${field} ~= "${value}*"`;
+
+                    case 'ENDS_WITH':
+                        return `${field} ~= "*${value}"`;
+
+                    case 'GT':
+                        return `${field} > ${value}`;
+
+                    case 'GTE':
+                        return `${field} >= ${value}`;
+
+                    case 'LT':
+                        return `${field} < ${value}`;
+
+                    case 'LTE':
+                        return `${field} <= ${value}`;
+
+                    default:
+                        // For unknown types, try a reasonable default
+                        if (typeof value === 'string') {
+                            return `${field} contains "${value}"`;
+                        }
+                        return `${field} = ${value}`;
+                }
+            }
+
+            // Process the investigation filter
+            if (investigation?.filter) {
+                processConditions(investigation.filter);
+            }
+
+            // Build the XQL query
+            let xql = `dataset = xdr_data\n| filter event_type = ${eventType}`;
+
+            // Add extracted filters
+            filters.forEach(f => {
+                xql += `\n| filter ${f}`;
+            });
+
+            // Add useful output fields based on event type
+            const outputFields = {
+                'PROCESS': '_time, agent_hostname, actor_process_image_name, action_process_image_name, action_process_image_command_line',
+                'FILE': '_time, agent_hostname, actor_process_image_name, action_file_name, action_file_path',
+                'NETWORK': '_time, agent_hostname, actor_process_image_name, action_remote_ip, action_remote_port, action_local_port',
+                'REGISTRY': '_time, agent_hostname, actor_process_image_name, action_registry_key_name, action_registry_value_name',
+                'LOAD_IMAGE': '_time, agent_hostname, actor_process_image_name, action_module_path, action_module_sha256',
+                'EVENT_LOG': '_time, agent_hostname, action_evtlog_event_id, action_evtlog_provider_name, action_evtlog_message'
+            };
+
+            if (outputFields[eventType]) {
+                xql += `\n| fields ${outputFields[eventType]}`;
+            }
+
+            // Add header comment with context
+            const header = [
+                '// ═══════════════════════════════════════════════════════════════',
+                '// AUTO-GENERATED FROM QUERY BUILDER BIOC',
+                '// ═══════════════════════════════════════════════════════════════',
+                '//',
+                `// Original logic: ${indicatorText || 'N/A'}`,
+                '//',
+                '// ⚠️  PLEASE REVIEW: This XQL is an approximation of the Query Builder',
+                '//    logic. Verify the filters and field names match your intent.',
+                '// ═══════════════════════════════════════════════════════════════',
+                ''
+            ].join('\n');
+
+            return header + xql;
+        }
+
+        function populateTechniqueList() {
+            const list = document.getElementById('technique-list');
+            list.innerHTML = '';
+
+            // Sort techniques by ID
+            const sortedTechniques = Object.entries(mitreData).sort((a, b) => a[0].localeCompare(b[0]));
+
+            sortedTechniques.forEach(([techId, data]) => {
+                const label = document.createElement('label');
+                label.className = 'mitre-item';
+                label.dataset.tactics = (data.tactic_ids || []).join(',');
+                label.dataset.name = data.name.toLowerCase();
+                label.innerHTML = `
+                    <input type="checkbox" name="techniques" value="${techId}"
+                           onchange="onTechniqueChange(this)">
+                    <span class="mitre-id">${techId}</span>
+                    <span class="mitre-name">${data.name}</span>
+                `;
+                list.appendChild(label);
+            });
+        }
+
+        function filterTechniques() {
+            const search = document.getElementById('technique-search').value.toLowerCase();
+            const selectedTacticSet = new Set(selectedTactics);
+
+            document.querySelectorAll('#technique-list .mitre-item').forEach(item => {
+                const techTactics = item.dataset.tactics.split(',');
+                const name = item.dataset.name;
+                const id = item.querySelector('.mitre-id').textContent.toLowerCase();
+
+                const matchesSearch = !search || name.includes(search) || id.includes(search);
+                const matchesTactic = selectedTactics.length === 0 ||
+                    techTactics.some(t => selectedTacticSet.has(t));
+
+                item.style.display = matchesSearch && matchesTactic ? 'flex' : 'none';
+            });
+        }
+
+        function onTacticChange(checkbox) {
+            const tacticId = checkbox.value;
+
+            if (checkbox.checked) {
+                if (selectedType === 'bioc' && selectedTactics.length >= BIOC_MAX_TACTICS) {
+                    checkbox.checked = false;
+                    alert(`BIOC rules support a maximum of ${BIOC_MAX_TACTICS} tactics.`);
+                    return;
+                }
+                selectedTactics.push(tacticId);
+            } else {
+                selectedTactics = selectedTactics.filter(t => t !== tacticId);
+            }
+
+            filterTechniques();
+            updateSelectedMitreDisplay();
+        }
+
+        function onTechniqueChange(checkbox) {
+            const techId = checkbox.value;
+
+            if (checkbox.checked) {
+                if (selectedType === 'bioc' && selectedTechniques.length >= BIOC_MAX_TECHNIQUES) {
+                    checkbox.checked = false;
+                    alert(`BIOC rules support a maximum of ${BIOC_MAX_TECHNIQUES} techniques.`);
+                    return;
+                }
+                selectedTechniques.push(techId);
+            } else {
+                selectedTechniques = selectedTechniques.filter(t => t !== techId);
+            }
+
+            updateSelectedMitreDisplay();
+        }
+
+        function updateTechniqueCheckboxes() {
+            document.querySelectorAll('#technique-list input[type="checkbox"]').forEach(cb => {
+                cb.checked = selectedTechniques.includes(cb.value);
+            });
+        }
+
+        function updateSelectedMitreDisplay() {
+            const container = document.getElementById('selected-mitre-tags');
+
+            if (selectedTactics.length === 0 && selectedTechniques.length === 0) {
+                container.innerHTML = '<span class="empty-selection">No techniques selected</span>';
+                return;
+            }
+
+            let html = '';
+
+            selectedTactics.forEach(tacticId => {
+                const tactic = tactics.find(t => t.id === tacticId);
+                html += `<span class="selected-mitre-tag tactic" onclick="removeTactic('${tacticId}')">${tactic?.name || tacticId} ×</span>`;
+            });
+
+            selectedTechniques.forEach(techId => {
+                const tech = mitreData[techId];
+                html += `<span class="selected-mitre-tag technique" onclick="removeTechnique('${techId}')">${techId}: ${tech?.name || ''} ×</span>`;
+            });
+
+            container.innerHTML = html;
+        }
+
+        function removeTactic(tacticId) {
+            selectedTactics = selectedTactics.filter(t => t !== tacticId);
+            const checkbox = document.querySelector(`#tactic-list input[value="${tacticId}"]`);
+            if (checkbox) checkbox.checked = false;
+            filterTechniques();
+            updateSelectedMitreDisplay();
+        }
+
+        function removeTechnique(techId) {
+            selectedTechniques = selectedTechniques.filter(t => t !== techId);
+            const checkbox = document.querySelector(`#technique-list input[value="${techId}"]`);
+            if (checkbox) checkbox.checked = false;
+            updateSelectedMitreDisplay();
+        }
+
+        function addTag(tag) {
+            if (!tag || tags.includes(tag)) return;
+            tags.push(tag);
+            renderTags();
+        }
+
+        function removeTag(tag) {
+            tags = tags.filter(t => t !== tag);
+            renderTags();
+        }
+
+        function renderTags() {
+            const container = document.getElementById('tags-list');
+            container.innerHTML = tags.map(tag =>
+                `<span class="tag-pill">${tag} <button type="button" onclick="removeTag('${tag}')">×</button></span>`
+            ).join('');
+        }
+
+        function formatQuery() {
+            const textarea = document.getElementById('xql-query');
+            let query = textarea.value;
+            // Basic formatting: add newlines after pipes
+            query = query.replace(/\s*\|\s*/g, '\n| ');
+            textarea.value = query.trim();
+        }
+
+        function validateQuery() {
+            const query = document.getElementById('xql-query').value;
+            const validation = document.getElementById('query-validation');
+            const errors = [];
+
+            if (!query.trim()) {
+                errors.push('Query cannot be empty');
+            }
+
+            if (!query.includes('dataset')) {
+                errors.push('Query must specify a dataset');
+            }
+
+            if (selectedType === 'bioc') {
+                if (!query.includes('xdr_data') && !query.includes('cloud_audit_log')) {
+                    errors.push('BIOC rules must use xdr_data or cloud_audit_log dataset');
+                }
+                if (!query.includes('event_type')) {
+                    errors.push('BIOC rules must filter on event_type');
+                }
+                if (query.includes('comp ') || query.includes('| comp')) {
+                    errors.push('BIOC rules cannot use aggregations');
+                }
+            }
+
+            if (selectedType === 'widget' && !query.includes('| view')) {
+                errors.push('Widget queries should include a | view statement');
+            }
+
+            if (errors.length > 0) {
+                validation.innerHTML = `<div class="validation-error">${errors.map(e => `<div>⚠️ ${e}</div>`).join('')}</div>`;
+            } else {
+                validation.innerHTML = '<div class="validation-success">✅ Query looks valid!</div>';
+            }
+        }
+
+        function nextStep() {
+            if (!validateCurrentStep()) return;
+
+            if (currentStep < 4) {
+                currentStep++;
+                updateStepDisplay();
+
+                if (currentStep === 4) {
+                    generateReview();
+                }
+            }
+        }
+
+        function previousStep() {
+            if (currentStep > 1) {
+                currentStep--;
+                updateStepDisplay();
+            }
+        }
+
+        function validateCurrentStep() {
+            switch(currentStep) {
+                case 1:
+                    return selectedType !== null;
+                case 2:
+                    if (selectedType === 'import' && !importedData) {
+                        alert('Please upload a file first');
+                        return false;
+                    }
+                    const name = document.getElementById('query-name').value;
+                    const desc = document.getElementById('query-description').value;
+                    const author = document.getElementById('author-name').value;
+                    if (!name || !desc || !author) {
+                        alert('Please fill in all required fields');
+                        return false;
+                    }
+                    return true;
+                case 3:
+                    const query = document.getElementById('xql-query').value;
+                    if (!query.trim()) {
+                        alert('Please enter an XQL query');
+                        return false;
+                    }
+                    return true;
+                default:
+                    return true;
+            }
+        }
+
+        function updateStepDisplay() {
+            // Update progress steps
+            document.querySelectorAll('.progress-step').forEach(step => {
+                const stepNum = parseInt(step.dataset.step);
+                step.classList.remove('active', 'completed');
+                if (stepNum === currentStep) step.classList.add('active');
+                if (stepNum < currentStep) step.classList.add('completed');
+            });
+
+            // Update wizard steps
+            document.querySelectorAll('.wizard-step').forEach(step => {
+                step.classList.remove('active');
+                if (parseInt(step.dataset.step) === currentStep) step.classList.add('active');
+            });
+
+            updateNavigationButtons();
+        }
+
+        function updateNavigationButtons() {
+            const prevBtn = document.getElementById('prev-btn');
+            const nextBtn = document.getElementById('next-btn');
+            const submitBtn = document.getElementById('submit-btn');
+
+            prevBtn.style.display = currentStep > 1 ? 'inline-flex' : 'none';
+            nextBtn.style.display = currentStep < 4 ? 'inline-flex' : 'none';
+            submitBtn.style.display = currentStep === 4 ? 'inline-flex' : 'none';
+
+            // Enable/disable next based on selection
+            if (currentStep === 1) {
+                nextBtn.disabled = selectedType === null;
+            } else {
+                nextBtn.disabled = false;
+            }
+        }
+
+        function generateReview() {
+            const name = document.getElementById('query-name').value;
+            const description = document.getElementById('query-description').value;
+            const author = document.getElementById('author-name').value;
+            const query = document.getElementById('xql-query').value;
+            const severity = document.getElementById('severity').value;
+
+            // Update review card
+            document.getElementById('review-name').textContent = name;
+            document.getElementById('review-description').textContent = description;
+            document.getElementById('review-author').innerHTML = `
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="12" cy="7" r="4"></circle>
+                </svg>
+                ${author}
+            `;
+
+            // Type badge
+            const typeBadge = document.getElementById('review-type-badge');
+            const typeLabels = {
+                'hunting': 'THREAT HUNTING',
+                'bioc': 'BIOC',
+                'correlation': 'CORRELATION',
+                'hygiene': 'IT HYGIENE',
+                'widget': 'WIDGET'
+            };
+            typeBadge.textContent = typeLabels[selectedType] || selectedType.toUpperCase();
+            typeBadge.className = `review-type-badge ${selectedType}`;
+
+            // Severity
+            const severityEl = document.getElementById('review-severity');
+            if (severity && (selectedType === 'bioc' || selectedType === 'correlation')) {
+                severityEl.style.display = 'inline';
+                severityEl.innerHTML = `Severity: <strong>${severity}</strong>`;
+            } else {
+                severityEl.style.display = 'none';
+            }
+
+            // MITRE tags
+            const mitreContainer = document.getElementById('review-mitre');
+            mitreContainer.innerHTML = selectedTechniques.map(techId =>
+                `<span class="review-mitre-tag">🎯 ${techId}</span>`
+            ).join('');
+
+            // Tags
+            const tagsContainer = document.getElementById('review-tags');
+            tagsContainer.innerHTML = tags.map(tag =>
+                `<span class="review-tag">${tag}</span>`
+            ).join('');
+
+            // Query
+            document.getElementById('review-query-code').textContent = query;
+
+            // Generate YAML
+            generateYaml();
+        }
+
+        function generateYaml() {
+            const name = document.getElementById('query-name').value;
+            const description = document.getElementById('query-description').value;
+            const author = document.getElementById('author-name').value;
+            const query = document.getElementById('xql-query').value;
+            const severity = document.getElementById('severity').value;
+
+            // Get selected log sources
+            const logSources = Array.from(document.querySelectorAll('input[name="log_sources"]:checked'))
+                .map(cb => cb.value);
+
+            let yaml = `name: "${name}"
+author: "${author}"
+description: "${description.replace(/"/g, '\\"')}"
+content_type: ${selectedType}`;
+
+            if (severity && (selectedType === 'bioc' || selectedType === 'correlation')) {
+                yaml += `\nseverity: "${severity.charAt(0).toUpperCase() + severity.slice(1)}"`;
+            }
+
+            if (selectedType === 'bioc') {
+                const category = document.getElementById('bioc-category').value;
+                const eventType = document.getElementById('bioc-event-type').value;
+                if (category) yaml += `\nbioc_category: "${category}"`;
+                if (eventType) yaml += `\nevent_type: "${eventType}"`;
+            }
+
+            if (selectedType === 'correlation') {
+                const schedule = document.getElementById('corr-schedule').value;
+                const timeframe = document.getElementById('corr-timeframe').value;
+                const alertName = document.getElementById('alert-name').value;
+                yaml += `\nschedule: "${schedule}"`;
+                yaml += `\nquery_timeframe: "${timeframe}"`;
+                if (alertName) yaml += `\nalert_name: "${alertName.replace(/"/g, '\\"')}"`;
+            }
+
+            if (selectedTechniques.length > 0) {
+                yaml += `\nmitre_ids:`;
+                selectedTechniques.forEach(techId => {
+                    yaml += `\n  - "${techId}"`;
+                });
+            }
+
+            if (logSources.length > 0) {
+                yaml += `\nlog_sources:`;
+                logSources.forEach(src => {
+                    yaml += `\n  - "${src}"`;
+                });
+            }
+
+            if (tags.length > 0) {
+                yaml += `\ntags:`;
+                tags.forEach(tag => {
+                    yaml += `\n  - "${tag}"`;
+                });
+            }
+
+            yaml += `\nquery: |\n${query.split('\n').map(line => '  ' + line).join('\n')}`;
+
+            document.getElementById('yaml-output').textContent = yaml;
+        }
+
+        function copyYaml() {
+            const yaml = document.getElementById('yaml-output').textContent;
+            navigator.clipboard.writeText(yaml).then(() => {
+                const btn = document.querySelector('.copy-yaml-btn');
+                btn.textContent = '✓ Copied!';
+                setTimeout(() => {
+                    btn.innerHTML = `
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                        </svg>
+                        Copy YAML
+                    `;
+                }, 2000);
+            });
+        }
+
+        function selectSubmission(method) {
+            submissionMethod = method;
+            document.querySelectorAll('.submission-option').forEach(opt => {
+                opt.classList.remove('selected');
+                opt.querySelector('input').checked = false;
+            });
+            const selected = document.querySelector(`.submission-option input[value="${method}"]`);
+            selected.checked = true;
+            selected.closest('.submission-option').classList.add('selected');
+        }
+
+        function submitContribution() {
+            const yaml = document.getElementById('yaml-output').textContent;
+            const name = document.getElementById('query-name').value;
+
+            if (submissionMethod === 'download') {
+                // Download YAML file
+                const blob = new Blob([yaml], { type: 'text/yaml' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = name.toLowerCase().replace(/[^a-z0-9]+/g, '_') + '.yaml';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+
+                showSuccessModal('download');
+            } else {
+                // Create GitHub issue
+                createGitHubIssue();
+            }
+        }
+
+        function createGitHubIssue() {
+            const name = document.getElementById('query-name').value;
+            const yaml = document.getElementById('yaml-output').textContent;
+            const author = document.getElementById('author-name').value;
+
+            const title = encodeURIComponent(`[Contribution] ${name}`);
+            const body = encodeURIComponent(`## New Query Contribution
+
+**Submitted by:** ${author}
+
+### YAML Content
+\`\`\`yaml
+${yaml}
+\`\`\`
+
+### Checklist
+- [ ] Query has been tested
+- [ ] Description is clear and accurate
+- [ ] MITRE ATT&CK mapping is correct
+- [ ] No sensitive/proprietary information included
+`);
+
+            const url = `https://github.com/intrusus-dev/xsiam-hub/issues/new?title=${title}&body=${body}&labels=contribution`;
+            window.open(url, '_blank');
+
+            showSuccessModal('github');
+        }
+
+        function showSuccessModal(type) {
+            // Hide wizard steps and navigation
+            document.querySelectorAll('.wizard-step').forEach(step => step.style.display = 'none');
+            document.querySelector('.wizard-navigation').style.display = 'none';
+            document.querySelector('.wizard-progress').style.display = 'none';
+
+            // Show success screen
+            const successScreen = document.getElementById('success-screen');
+            successScreen.style.display = 'block';
+
+            // Update success message based on submission type
+            const details = document.getElementById('success-details');
+
+            if (type === 'download') {
+                details.innerHTML = `
+                    <div class="success-info">
+                        <h4>📥 YAML Downloaded</h4>
+                        <p>Your YAML file has been downloaded. To complete your contribution:</p>
+                        <ol>
+                            <li>Fork the <a href="https://github.com/intrusus-dev/xsiam-hub" target="_blank">XSIAM Hub repository</a></li>
+                            <li>Add your YAML file to the <code>/queries</code> folder</li>
+                            <li>Create a Pull Request</li>
+                        </ol>
+                    </div>
+                `;
+            } else {
+                details.innerHTML = `
+                    <div class="success-info">
+                        <h4>🐙 GitHub Issue Created</h4>
+                        <p>A new browser tab has been opened with your contribution.</p>
+                        <p>Please review the pre-filled issue and click <strong>Submit new issue</strong> to complete your contribution.</p>
+                    </div>
+                `;
+            }
+        }
+
+        function confirmClose() {
+            // Check if user has entered any data
+            const hasData = selectedType !== null ||
+                           document.getElementById('query-name')?.value ||
+                           document.getElementById('xql-query')?.value ||
+                           currentStep > 1;
+
+            if (hasData) {
+                document.getElementById('close-modal').style.display = 'flex';
+            } else {
+                closeWizard();
+            }
+        }
+
+        function hideCloseModal() {
+            document.getElementById('close-modal').style.display = 'none';
+        }
+
+        function closeWizard() {
+            window.location.href = '/';
+        }
+
+        function resetWizard() {
+            // Reset all state
+            currentStep = 1;
+            selectedType = null;
+            selectedTactics = [];
+            selectedTechniques = [];
+            tags = [];
+            importedData = null;
+            submissionMethod = 'download';
+
+            // Reset form fields
+            document.getElementById('query-name').value = '';
+            document.getElementById('query-description').value = '';
+            document.getElementById('author-name').value = '';
+            document.getElementById('github-username').value = '';
+            document.getElementById('xql-query').value = '';
+            document.getElementById('severity').value = '';
+            document.getElementById('tags-list').innerHTML = '';
+
+            // Reset checkboxes
+            document.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+
+            // Reset content type selection
+            document.querySelectorAll('.content-type-card').forEach(card => card.classList.remove('selected'));
+
+            // Reset UI visibility
+            document.querySelector('.wizard-progress').style.display = 'flex';
+            document.querySelector('.wizard-navigation').style.display = 'flex';
+            document.getElementById('success-screen').style.display = 'none';
+
+            // Show step 1
+            document.querySelectorAll('.wizard-step').forEach(step => {
+                step.style.display = 'none';
+                step.classList.remove('active');
+            });
+            document.querySelector('.wizard-step[data-step="1"]').style.display = 'block';
+            document.querySelector('.wizard-step[data-step="1"]').classList.add('active');
+
+            // Reset progress indicators
+            document.querySelectorAll('.progress-step').forEach(step => {
+                step.classList.remove('active', 'completed');
+            });
+            document.querySelector('.progress-step[data-step="1"]').classList.add('active');
+
+            // Reset navigation buttons
+            updateNavigationButtons();
+
+            // Update MITRE display
+            updateSelectedMitreDisplay();
+            updateTechniqueCheckboxes();
+        }
+    </script>
+
+</body>
+</html>

@@ -38,6 +38,16 @@ MITRE_TACTICS = [
     {"id": "TA0040", "name": "Impact", "shortname": "impact"},
 ]
 
+# Content type display mappings
+CONTENT_TYPE_LABELS = {
+    "hunting": "Threat Hunting",
+    "bioc": "BIOC",
+    "correlation": "Correlation Rule",
+    "hygiene": "IT Hygiene",
+    "widget": "Dashboard Widget",
+    "xql": "XQL Query"
+}
+
 
 def load_mitre_data():
     """Load MITRE ATT&CK data with proper many-to-many tactic mappings."""
@@ -124,6 +134,17 @@ async def homepage(request: Request):
         "filters": {k: sorted(list(v)) for k, v in FILTER_OPTIONS.items()},
         "tactics": MITRE_TACTICS,
         "techniques_in_use": techniques_in_use,
+        "mitre_data": MITRE_DATA,
+        "content_type_labels": CONTENT_TYPE_LABELS
+    })
+
+
+@app.get("/contribute", response_class=HTMLResponse)
+async def contribute_wizard(request: Request):
+    """Render the contribution wizard page."""
+    return templates.TemplateResponse("wizard.html", {
+        "request": request,
+        "tactics": MITRE_TACTICS,
         "mitre_data": MITRE_DATA
     })
 
@@ -134,10 +155,9 @@ async def search(
         q: str = "",
         content_type: str = "",
         mitre: List[str] = Query(default=[]),
-        log_source: str = "",
-        sort: str = "created-desc"
+        log_source: str = ""
 ):
-    filtered = QUERY_DB.copy()
+    filtered = QUERY_DB
     q_lower = q.lower()
 
     # 1. Text Search
@@ -168,22 +188,6 @@ async def search(
     if log_source and log_source != "all":
         filtered = [x for x in filtered if log_source in x.get('log_sources', [])]
 
-    # 5. Sort results
-    severity_order = {'critical': 0, 'high': 1, 'medium': 2, 'low': 3, '': 4}
-
-    if sort == "name":
-        filtered.sort(key=lambda x: x.get('name', '').lower())
-    elif sort == "name-desc":
-        filtered.sort(key=lambda x: x.get('name', '').lower(), reverse=True)
-    elif sort == "severity":
-        filtered.sort(key=lambda x: severity_order.get(x.get('severity', '').lower(), 4))
-    elif sort == "type":
-        filtered.sort(key=lambda x: x.get('content_type', ''))
-    elif sort == "created-desc":
-        filtered.sort(key=lambda x: x.get('created', ''), reverse=True)
-    elif sort == "created-asc":
-        filtered.sort(key=lambda x: x.get('created', ''))
-
     return templates.TemplateResponse("partials/query_cards.html", {
         "request": request,
         "queries": filtered
@@ -200,6 +204,12 @@ async def get_filters():
         "tactics": MITRE_TACTICS,
         "mitre_data": MITRE_DATA
     }
+
+
+@app.get("/api/content-types", response_class=JSONResponse)
+async def get_content_types():
+    """API endpoint to get content type labels."""
+    return CONTENT_TYPE_LABELS
 
 
 @app.post("/webhook/refresh")
