@@ -144,6 +144,9 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Install dependencies
+        run: pip install pyyaml
+
       - name: Check for duplicates
         run: |
           python << 'EOF'
