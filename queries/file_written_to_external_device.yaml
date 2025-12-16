@@ -1,0 +1,21 @@
+name: "File written to external device"
+author: "Lukasz Kubik"
+description: "Detects file activity (writing, opening, or creating files) specifically on removable media (like USB drives or external hard drives)."
+content_type: bioc
+severity: "High"
+bioc_category: "exfiltration"
+event_type: "FILE"
+mitre_ids:
+  - "T1052.001"
+  - "T1052"
+log_sources:
+  - "Cortex XDR Agent"
+tags:
+  - "USB Drive"
+  - "External Drive"
+  - "Data Exfiltration"
+query: |
+  dataset = xdr_data
+  | filter event_type = ENUM.FILE and event_sub_type in (ENUM.FILE_WRITE, ENUM.FILE_OPEN, ENUM.FILE_CREATE_NEW)
+  | alter device_type = json_extract(action_file_device_info, "$.storage_device_drive_type")
+  | filter device_type = "2" // 2 = removable devices

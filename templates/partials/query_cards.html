@@ -26,7 +26,11 @@
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                 <circle cx="12" cy="7" r="4"></circle>
             </svg>
+            {% if query.github %}
+            <a href="https://github.com/{{ query.github | replace('@', '') }}" target="_blank" class="author-link" title="View GitHub profile">{{ query.author }}</a>
+            {% else %}
             <span>{{ query.author }}</span>
+            {% endif %}
         </div>
         {% endif %}
     </div>

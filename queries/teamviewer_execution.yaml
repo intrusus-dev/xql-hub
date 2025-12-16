@@ -1,0 +1,18 @@
+name: "TeamViewer Execution"
+author: "Lukasz Kubik"
+description: "Identifies potentially malicious processes masquerading as legitimate TeamViewer software on non-Linux systems. It flags execution events where the binary claims to be signed by \"TeamViewer Germany GmbH\" but fails digital signature validation. This discrepancy indicates an adversary is likely using a spoofed or tampered executable to evade security controls."
+content_type: bioc
+severity: "Low"
+bioc_category: "execution"
+event_type: "PROCESS"
+mitre_ids:
+  - "T1036.001"
+  - "T1036.005"
+  - "T1553.002"
+log_sources:
+  - "Cortex XDR Agent"
+tags:
+  - "TeamViewer"
+  - "Remote Access"
+query: |
+  Process action type = execution AND process execution signature = Invalid Signature AND process execution signer = TeamViewer Germany GmbH Host host os != linux

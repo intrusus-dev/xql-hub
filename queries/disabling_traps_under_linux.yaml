@@ -1,0 +1,17 @@
+name: "Disabling Traps under Linux"
+author: "Lukasz Kubik"
+description: "This BIOC is designed to detect attempts to tamper with the endpoint security agent. Specifically, it identifies command-line executions that attempt to stop or disable the Traps (Palo Alto Networks Cortex XDR) service on a Linux operating system."
+content_type: bioc
+severity: "Critical"
+bioc_category: "tampering"
+event_type: "PROCESS"
+mitre_ids:
+  - "T1562.001"
+log_sources:
+  - "Cortex XDR Agent"
+tags:
+  - "Tamper Protection"
+  - "Linux"
+query: |
+  dataset = xdr_data
+  | filter event_type = ENUM.PROCESS and (actor_process_command_line contains "systemctl stop traps_pmd.service" or actor_process_command_line contains "disable traps_pmd.service" or actor_process_command_line contains "service traps_pmd stop" or actor_process_command_line contains "service traps_pmd disable")

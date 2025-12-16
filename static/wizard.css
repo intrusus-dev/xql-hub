@@ -446,6 +446,194 @@
     margin-top: 1px;
 }
 
+/* ========== RULE SELECTION (Multi-rule import) ========== */
+.rule-selection {
+    background: var(--bg-elevated);
+    border: 1px solid var(--accent-muted);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+}
+
+.rule-selection-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.rule-selection-icon {
+    font-size: 2rem;
+    flex-shrink: 0;
+}
+
+.rule-selection-info {
+    flex: 1;
+}
+
+.rule-selection-info h3 {
+    margin: 0 0 0.25rem 0;
+    font-size: 1.1rem;
+    color: var(--text-primary);
+}
+
+.rule-selection-info p {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.rule-selection-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1rem;
+    max-height: 400px;
+    overflow-y: auto;
+    padding-right: 0.5rem;
+}
+
+.rule-selection-grid::-webkit-scrollbar {
+    width: 6px;
+}
+
+.rule-selection-grid::-webkit-scrollbar-track {
+    background: var(--bg-deep);
+    border-radius: 3px;
+}
+
+.rule-selection-grid::-webkit-scrollbar-thumb {
+    background: var(--border-strong);
+    border-radius: 3px;
+}
+
+.rule-selection-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    padding: 1rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.rule-selection-card:hover {
+    border-color: var(--accent);
+    background: var(--accent-glow);
+    transform: translateY(-2px);
+}
+
+.rule-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.rule-card-index {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    background: var(--bg-deep);
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.rule-card-severity {
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.rule-card-severity.critical {
+    background: rgba(255, 71, 87, 0.15);
+    color: #ff4757;
+}
+
+.rule-card-severity.high {
+    background: rgba(255, 107, 53, 0.15);
+    color: #ff6b35;
+}
+
+.rule-card-severity.medium {
+    background: rgba(255, 165, 2, 0.15);
+    color: #ffa502;
+}
+
+.rule-card-severity.low {
+    background: rgba(123, 237, 159, 0.15);
+    color: #7bed9f;
+}
+
+.rule-card-severity.info,
+.rule-card-severity.unknown {
+    background: rgba(136, 153, 166, 0.15);
+    color: var(--text-muted);
+}
+
+.rule-card-name {
+    margin: 0 0 0.5rem 0;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    line-height: 1.3;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.rule-card-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.rule-card-category {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    background: var(--bg-deep);
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.rule-card-mitre {
+    font-size: 0.7rem;
+    color: var(--accent);
+    background: var(--accent-glow);
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.rule-card-action {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.35rem;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--border-subtle);
+}
+
+.rule-selection-card:hover .rule-card-action {
+    color: var(--accent);
+}
+
+.rule-selection-hint {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    padding: 0.75rem;
+    background: var(--bg-deep);
+    border-radius: var(--radius-sm);
+}
+
 /* Query Section */
 .query-section {
     margin-bottom: 2rem;
@@ -992,6 +1180,10 @@
     }
 
     .submission-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .rule-selection-grid {
         grid-template-columns: 1fr;
     }
 }

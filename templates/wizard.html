@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Contribute - XSIAM Hub</title>
+    <title>Contribute - XQL Hub</title>
     <link rel="stylesheet" href="/static/style.css">
     <link rel="stylesheet" href="/static/wizard.css">
 </head>
 <body>
 
     <header>
-        <a href="/" class="logo">XSIAM <span>HUB</span></a>
+        <a href="/" class="logo">XQL <span>HUB</span></a>
         <div class="header-controls">
             <span class="header-title">Contribution Wizard</span>
         </div>
@@ -154,6 +154,25 @@
                         <p class="dropzone-hint">Accepts .bioc and .json files exported from Cortex XSIAM/XDR</p>
                         <input type="file" id="file-input" accept=".bioc,.json" style="display: none;">
                     </div>
+
+                    <!-- Rule Selection (shown when file contains multiple rules) -->
+                    <div class="rule-selection" id="rule-selection" style="display: none;">
+                        <div class="rule-selection-header">
+                            <div class="rule-selection-icon">📋</div>
+                            <div class="rule-selection-info">
+                                <h3>Multiple rules detected</h3>
+                                <p id="rule-selection-count">This file contains X rules. Select which one to import:</p>
+                            </div>
+                            <button type="button" class="preview-remove" onclick="clearImport()">×</button>
+                        </div>
+                        <div class="rule-selection-grid" id="rule-selection-grid">
+                            <!-- Rule cards will be populated here -->
+                        </div>
+                        <div class="rule-selection-hint">
+                            <span>💡</span> Want to import multiple rules? You'll need to import them one at a time.
+                        </div>
+                    </div>
+
                     <div class="import-preview" id="import-preview" style="display: none;">
                         <div class="preview-header">
                             <span class="preview-icon">✅</span>
@@ -512,7 +531,7 @@
                 <div class="success-content">
                     <div class="success-icon">🎉</div>
                     <h2>Contribution Submitted!</h2>
-                    <p class="success-message" id="success-message">Thank you for contributing to XSIAM Hub!</p>
+                    <p class="success-message" id="success-message">Thank you for contributing to XQL Hub!</p>
 
                     <div class="success-details" id="success-details">
                         <!-- Will be populated based on submission method -->
@@ -574,11 +593,30 @@
         let selectedTechniques = [];
         let tags = [];
         let importedData = null;
+        let importedRulesArray = null;  // Store all rules when multi-rule file is imported
+        let importedFileName = null;    // Store the filename for reference
         let submissionMethod = 'download';
 
         // BIOC type limits
         const BIOC_MAX_TACTICS = 3;
         const BIOC_MAX_TECHNIQUES = 3;
+
+        // Deprecated MITRE technique mappings (old ID -> new ID)
+        const DEPRECATED_TECHNIQUES = {
+            'T1089': 'T1562.001',  // Disabling Security Tools -> Disable or Modify Tools
+            'T1093': 'T1055.012',  // Process Hollowing (moved to subtechnique)
+            'T1086': 'T1059.001',  // PowerShell (moved to subtechnique)
+            'T1064': 'T1059',      // Scripting (consolidated)
+            'T1085': 'T1218.011',  // Rundll32 (moved to subtechnique)
+            'T1117': 'T1218.010',  // Regsvr32 (moved to subtechnique)
+            'T1118': 'T1218.004',  // InstallUtil (moved to subtechnique)
+            'T1121': 'T1218.009',  // Regsvcs/Regasm (moved to subtechnique)
+            'T1127': 'T1127.001',  // Trusted Developer Utilities (restructured)
+            'T1128': 'T1546.007',  // Netsh Helper DLL (moved)
+            'T1191': 'T1218.003',  // CMSTP (moved to subtechnique)
+            'T1015': 'T1546.008',  // Accessibility Features (moved)
+            'T1138': 'T1546.011',  // Application Shimming (moved)
+        };
 
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
@@ -681,30 +719,125 @@
                 try {
                     let content = e.target.result;
                     let parsed;
+                    let fileType;
 
                     if (file.name.endsWith('.bioc')) {
                         // BIOC files have MD5 hash on first line
                         const lines = content.split('\n');
                         content = lines.slice(1).join('\n');
                         parsed = JSON.parse(content);
-                        if (Array.isArray(parsed)) parsed = parsed[0];
-                        importedData = { type: 'bioc', data: parsed };
-                        selectedType = 'bioc';
+                        fileType = 'bioc';
                     } else {
                         parsed = JSON.parse(content);
-                        if (Array.isArray(parsed)) parsed = parsed[0];
-                        importedData = { type: 'correlation', data: parsed };
-                        selectedType = 'correlation';
+                        fileType = 'correlation';
                     }
 
-                    showImportPreview(file.name, importedData);
-                    populateFromImport(importedData);
+                    // Store filename for reference
+                    importedFileName = file.name;
+
+                    // Check if file contains multiple rules
+                    if (Array.isArray(parsed) && parsed.length > 1) {
+                        // Multiple rules - show selection UI
+                        importedRulesArray = parsed;
+                        selectedType = fileType;
+                        showRuleSelection(file.name, parsed, fileType);
+                    } else {
+                        // Single rule - proceed as before
+                        const singleRule = Array.isArray(parsed) ? parsed[0] : parsed;
+                        importedData = { type: fileType, data: singleRule };
+                        selectedType = fileType;
+                        importedRulesArray = null;
+                        showImportPreview(file.name, importedData);
+                        populateFromImport(importedData);
+                    }
 
                 } catch (err) {
                     alert('Error parsing file: ' + err.message);
                 }
             };
             reader.readAsText(file);
+        }
+
+        function showRuleSelection(filename, rules, fileType) {
+            // Hide dropzone, show rule selection
+            document.getElementById('import-dropzone').style.display = 'none';
+            document.getElementById('import-preview').style.display = 'none';
+            document.getElementById('rule-selection').style.display = 'block';
+
+            // Update count text
+            document.getElementById('rule-selection-count').textContent =
+                `This file contains ${rules.length} rules. Select which one to import:`;
+
+            // Build rule cards
+            const grid = document.getElementById('rule-selection-grid');
+            grid.innerHTML = '';
+
+            // Severity display mapping
+            const severityMap = {
+                'SEV_010_INFORMATIONAL': { label: 'Info', class: 'info' },
+                'SEV_020_LOW': { label: 'Low', class: 'low' },
+                'SEV_030_MEDIUM': { label: 'Medium', class: 'medium' },
+                'SEV_040_HIGH': { label: 'High', class: 'high' },
+                'SEV_050_CRITICAL': { label: 'Critical', class: 'critical' }
+            };
+
+            // Category display mapping
+            const categoryMap = {
+                'EVASION': 'Defense Evasion',
+                'TAMPERING': 'Tampering',
+                'EXFILTRATION': 'Exfiltration',
+                'EXECUTION': 'Execution',
+                'PERSISTENCE': 'Persistence',
+                'CREDENTIAL_ACCESS': 'Credential Access',
+                'DISCOVERY': 'Discovery',
+                'LATERAL_MOVEMENT': 'Lateral Movement',
+                'COLLECTION': 'Collection',
+                'OTHER': 'Other'
+            };
+
+            rules.forEach((rule, index) => {
+                const severity = severityMap[rule.severity] || { label: rule.severity || 'N/A', class: 'unknown' };
+                const category = categoryMap[rule.category] || rule.category || 'N/A';
+                const mitreId = extractMitreId(rule.mitre_technique_id_and_name || rule.mitre_technique_id) || 'N/A';
+
+                const card = document.createElement('div');
+                card.className = 'rule-selection-card';
+                card.onclick = () => selectRuleFromArray(index, fileType);
+                card.innerHTML = `
+                    <div class="rule-card-header">
+                        <span class="rule-card-index">#${index + 1}</span>
+                        <span class="rule-card-severity severity-${severity.class}">${severity.label}</span>
+                    </div>
+                    <h4 class="rule-card-name">${rule.name || 'Unnamed Rule'}</h4>
+                    <div class="rule-card-meta">
+                        <span class="rule-card-category">${category}</span>
+                        ${mitreId !== 'N/A' ? `<span class="rule-card-mitre">🎯 ${mitreId}</span>` : ''}
+                    </div>
+                    <div class="rule-card-action">
+                        <span>Click to import</span>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                            <polyline points="12 5 19 12 12 19"></polyline>
+                        </svg>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+
+            // Don't enable next button yet - user must select a rule
+            document.getElementById('next-btn').disabled = true;
+        }
+
+        function selectRuleFromArray(index, fileType) {
+            if (!importedRulesArray || index >= importedRulesArray.length) return;
+
+            const selectedRule = importedRulesArray[index];
+            importedData = { type: fileType, data: selectedRule };
+
+            // Hide rule selection, show preview
+            document.getElementById('rule-selection').style.display = 'none';
+            showImportPreview(importedFileName, importedData);
+            populateFromImport(importedData);
         }
 
         function showImportPreview(filename, data) {
@@ -736,9 +869,11 @@
                 if (d.category) {
                     html += `<div class="preview-item"><strong>Category:</strong> ${d.category}</div>`;
                 }
-                if (d.mitre_technique_id) {
-                    html += `<div class="preview-item"><strong>MITRE:</strong> ${d.mitre_technique_id}</div>`;
-                }
+
+                // Handle both mitre_technique_id and mitre_technique_id_and_name formats
+                const mitreDisplay = d.mitre_technique_id_and_name || d.mitre_technique_id || 'N/A';
+                html += `<div class="preview-item"><strong>MITRE:</strong> ${mitreDisplay}</div>`;
+
                 if (d.indicator?.investigationType) {
                     const eventTypeMap = {
                         'PROCESS_EXECUTION_EVENT': 'Process',
@@ -752,8 +887,25 @@
                     html += `<div class="preview-item"><strong>Event Type:</strong> ${eventTypeMap[d.indicator.investigationType] || d.indicator.investigationType}</div>`;
                 }
 
-                // Show warning for Query Builder BIOCs
-                if (!d.is_xql) {
+                // Check for deprecated MITRE techniques
+                const techId = extractMitreId(d.mitre_technique_id_and_name || d.mitre_technique_id);
+                if (techId && DEPRECATED_TECHNIQUES[techId]) {
+                    const newId = DEPRECATED_TECHNIQUES[techId];
+                    const newTech = mitreData[newId];
+                    html += `
+                        <div class="preview-warning">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <line x1="12" y1="8" x2="12" y2="12"></line>
+                                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                            </svg>
+                            <span><strong>Note:</strong> ${techId} is deprecated. Will be mapped to ${newId}${newTech ? ' (' + newTech.name + ')' : ''}.</span>
+                        </div>
+                    `;
+                }
+
+                // Show warning for Query Builder BIOCs (when there's no indicator_text)
+                if (!d.is_xql && !d.indicator_text) {
                     html += `
                         <div class="preview-warning">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -771,10 +923,26 @@
             document.getElementById('next-btn').disabled = false;
         }
 
+        // Helper to extract MITRE ID from various formats
+        function extractMitreId(value) {
+            if (!value) return null;
+            // Handle "T1089 - Disabling Security Tools" format
+            const match = value.match(/^(T\d{4}(?:\.\d{3})?)/);
+            return match ? match[1] : value;
+        }
+
+        // Map deprecated technique to current equivalent
+        function mapDeprecatedTechnique(techId) {
+            return DEPRECATED_TECHNIQUES[techId] || techId;
+        }
+
         function clearImport() {
             importedData = null;
+            importedRulesArray = null;
+            importedFileName = null;
             document.getElementById('import-dropzone').style.display = 'block';
             document.getElementById('import-preview').style.display = 'none';
+            document.getElementById('rule-selection').style.display = 'none';
             document.getElementById('file-input').value = '';
             document.getElementById('next-btn').disabled = true;
         }
@@ -784,7 +952,17 @@
 
             // Basic fields
             document.getElementById('query-name').value = d.name || '';
-            document.getElementById('query-description').value = d.description || d.comment || d.alert_description || d.indicator_text || '';
+
+            // Description: try multiple possible sources
+            const description = d.description || d.comment || d.alert_description || d.indicator_text || '';
+            document.getElementById('query-description').value = description;
+
+            // Author from source field (often an email)
+            if (d.source) {
+                // Extract name from email if possible
+                const emailMatch = d.source.match(/^([^@]+)@/);
+                document.getElementById('author-name').value = emailMatch ? emailMatch[1] : d.source;
+            }
 
             // Severity mapping
             if (d.severity) {
@@ -846,9 +1024,13 @@
                     }
                 }
 
-                // XQL Query - handle both XQL mode and Query Builder mode
-                if (d.is_xql && d.xql) {
-                    // XQL mode BIOC
+                // XQL Query - handle multiple possible sources
+                // Priority: 1) indicator_text (human-readable XQL), 2) xql if string, 3) generate from Query Builder
+                if (d.indicator_text && typeof d.indicator_text === 'string') {
+                    // indicator_text contains the human-readable XQL query
+                    document.getElementById('xql-query').value = d.indicator_text;
+                } else if (d.is_xql && d.xql && typeof d.xql === 'string') {
+                    // XQL mode BIOC with string xql field
                     document.getElementById('xql-query').value = d.xql;
                 } else if (!d.is_xql && d.indicator) {
                     // Query Builder mode - generate XQL approximation
@@ -857,24 +1039,56 @@
                 }
 
                 // MITRE mappings from direct fields (BIOC format)
+                // Handle both plain IDs and combined "ID - Name" format
+
+                // Tactic from mitre_tactic_id
                 if (d.mitre_tactic_id) {
-                    const tacticIds = Array.isArray(d.mitre_tactic_id) ? d.mitre_tactic_id : [d.mitre_tactic_id];
+                    let tacticIds = Array.isArray(d.mitre_tactic_id) ? d.mitre_tactic_id : [d.mitre_tactic_id];
                     tacticIds.forEach(tacticId => {
-                        if (tacticId && !selectedTactics.includes(tacticId)) {
-                            selectedTactics.push(tacticId);
-                            const tacticCheckbox = document.querySelector(`#tactic-list input[value="${tacticId}"]`);
+                        // Extract ID if in "TA0005 - Defense Evasion" format
+                        const extractedId = extractMitreId(tacticId) || tacticId;
+                        if (extractedId && extractedId.startsWith('TA') && !selectedTactics.includes(extractedId)) {
+                            selectedTactics.push(extractedId);
+                            const tacticCheckbox = document.querySelector(`#tactic-list input[value="${extractedId}"]`);
                             if (tacticCheckbox) tacticCheckbox.checked = true;
                         }
                     });
                 }
 
+                // Also check mitre_tactic_id_and_name field
+                if (d.mitre_tactic_id_and_name) {
+                    const tacticIdAndName = d.mitre_tactic_id_and_name;
+                    const extractedId = extractMitreId(tacticIdAndName);
+                    if (extractedId && extractedId.startsWith('TA') && !selectedTactics.includes(extractedId)) {
+                        selectedTactics.push(extractedId);
+                        const tacticCheckbox = document.querySelector(`#tactic-list input[value="${extractedId}"]`);
+                        if (tacticCheckbox) tacticCheckbox.checked = true;
+                    }
+                }
+
+                // Technique from mitre_technique_id
                 if (d.mitre_technique_id) {
-                    const techIds = Array.isArray(d.mitre_technique_id) ? d.mitre_technique_id : [d.mitre_technique_id];
+                    let techIds = Array.isArray(d.mitre_technique_id) ? d.mitre_technique_id : [d.mitre_technique_id];
                     techIds.forEach(techId => {
-                        if (techId && !selectedTechniques.includes(techId)) {
-                            selectedTechniques.push(techId);
+                        // Extract ID if in "T1089 - Disabling Security Tools" format
+                        let extractedId = extractMitreId(techId) || techId;
+                        // Map deprecated techniques to current equivalents
+                        extractedId = mapDeprecatedTechnique(extractedId);
+                        if (extractedId && extractedId.startsWith('T') && !selectedTechniques.includes(extractedId)) {
+                            selectedTechniques.push(extractedId);
                         }
                     });
+                }
+
+                // Also check mitre_technique_id_and_name field
+                if (d.mitre_technique_id_and_name) {
+                    const techIdAndName = d.mitre_technique_id_and_name;
+                    let extractedId = extractMitreId(techIdAndName);
+                    // Map deprecated techniques to current equivalents
+                    extractedId = mapDeprecatedTechnique(extractedId);
+                    if (extractedId && extractedId.startsWith('T') && !selectedTechniques.includes(extractedId)) {
+                        selectedTechniques.push(extractedId);
+                    }
                 }
 
                 // Also check btp_rule for additional MITRE mappings
@@ -893,13 +1107,28 @@
                             }
                             if (settings.technique_id) {
                                 settings.technique_id.forEach(techId => {
-                                    if (!selectedTechniques.includes(techId)) {
-                                        selectedTechniques.push(techId);
+                                    // Map deprecated techniques
+                                    const mappedId = mapDeprecatedTechnique(techId);
+                                    if (!selectedTechniques.includes(mappedId)) {
+                                        selectedTechniques.push(mappedId);
                                     }
                                 });
                             }
                         }
                     });
+                }
+
+                // Auto-select log sources based on content
+                if (d.indicator?.investigationType === 'PROCESS_EXECUTION_EVENT') {
+                    // Check for Linux-specific content
+                    const xql = d.indicator_text || '';
+                    if (xql.includes('traps_pmd') || xql.includes('systemctl') || xql.includes('service ')) {
+                        const linuxCheckbox = document.querySelector('input[value="Linux Audit Logs"]');
+                        if (linuxCheckbox) linuxCheckbox.checked = true;
+                    }
+                    // XDR agent is usually the source
+                    const xdrCheckbox = document.querySelector('input[value="Cortex XDR Agent"]');
+                    if (xdrCheckbox) xdrCheckbox.checked = true;
                 }
             }
 
@@ -919,7 +1148,8 @@
                     }
 
                     techniques.forEach(tech => {
-                        const techId = tech.split(' - ')[0];
+                        let techId = tech.split(' - ')[0];
+                        techId = mapDeprecatedTechnique(techId);
                         if (!selectedTechniques.includes(techId)) {
                             selectedTechniques.push(techId);
                         }
@@ -1717,13 +1947,15 @@ ${yaml}
             selectedTechniques = [];
             tags = [];
             importedData = null;
+            importedRulesArray = null;
+            importedFileName = null;
             submissionMethod = 'download';
 
             // Reset form fields
             document.getElementById('query-name').value = '';
             document.getElementById('query-description').value = '';
             document.getElementById('author-name').value = '';
-            document.getElementById('github-username').value = '';
+            document.getElementById('author-github').value = '';
             document.getElementById('xql-query').value = '';
             document.getElementById('severity').value = '';
             document.getElementById('tags-list').innerHTML = '';
@@ -1738,6 +1970,11 @@ ${yaml}
             document.querySelector('.wizard-progress').style.display = 'flex';
             document.querySelector('.wizard-navigation').style.display = 'flex';
             document.getElementById('success-screen').style.display = 'none';
+
+            // Reset import section
+            document.getElementById('import-dropzone').style.display = 'block';
+            document.getElementById('import-preview').style.display = 'none';
+            document.getElementById('rule-selection').style.display = 'none';
 
             // Show step 1
             document.querySelectorAll('.wizard-step').forEach(step => {
