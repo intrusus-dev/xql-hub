@@ -308,7 +308,7 @@
                 const isSelected = selectedMitre.has(baseId);
 
                 html += `
-                    <div class="technique-card ${isSelected ? 'selected' : ''}" data-technique="${baseId}" onclick="toggleTechnique('${baseId}')">
+                    <div class="technique-card ${isSelected ? 'selected' : ''}" data-technique="${baseId}" onclick="toggleTechnique('${baseId}')" title="${name} (${baseId})">
                         <div class="technique-card-header">
                             <span class="technique-card-name">${name}</span>
                             <span class="technique-card-count">${queryCount}</span>
@@ -387,6 +387,7 @@
             // Reset dropdowns
             document.getElementById('filter-content-type').value = 'all';
             document.getElementById('filter-log-source').value = 'all';
+            document.getElementById('filter-sort').value = 'name';
             document.getElementById('search-input').value = '';
 
             updateSelectedDisplay();
@@ -412,13 +413,19 @@
             const logSource = document.getElementById('filter-log-source')?.value || 'all';
             if (logSource !== 'all') params.append('log_source', logSource);
 
+            const sortBy = document.getElementById('filter-sort')?.value || 'name';
+            params.append('sort_by', sortBy);
+
             selectedMitre.forEach(mid => params.append('mitre', mid));
 
             htmx.ajax('GET', `/search?${params.toString()}`, '#results-grid');
         }
 
         // Initialize on load
-        document.addEventListener('DOMContentLoaded', buildMitreMatrix);
+        document.addEventListener('DOMContentLoaded', () => {
+            buildMitreMatrix();
+            triggerSearch();  // Trigger search on load to apply default sorting
+        });
     </script>
 
 </body>

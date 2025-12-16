@@ -6,7 +6,7 @@ on:
 
 jobs:
   create-pr:
-    if: github.event.label.name == 'status: approved'
+    if: "github.event.label.name == 'status: approved'"
     runs-on: ubuntu-latest
     permissions:
       contents: write
