@@ -3,3 +3,4 @@ uvicorn
 jinja2
 pyyaml
 htmx
+requests
