@@ -24,87 +24,129 @@ jobs:
 
       - name: Extract and Validate YAML
         id: validate
+        env:
+          GITHUB_EVENT_PATH: ${{ github.event_path }}
         run: |
-          python << 'EOF'
+          python << 'PYTHON_SCRIPT'
           import yaml
           import re
           import sys
           import os
-          
-          issue_body = """${{ github.event.issue.body }}"""
-          
+          import json
+
+          # Read issue body from the GitHub event file (secure method)
+          event_path = os.environ.get('GITHUB_EVENT_PATH', '')
+          if not event_path or not os.path.exists(event_path):
+              print("::error::Could not read GitHub event file")
+              sys.exit(1)
+
+          try:
+              with open(event_path, 'r', encoding='utf-8') as f:
+                  event_data = json.load(f)
+          except (json.JSONDecodeError, IOError) as e:
+              print(f"::error::Failed to parse event file: {e}")
+              sys.exit(1)
+
+          issue_body = event_data.get('issue', {}).get('body', '')
+
+          if not issue_body:
+              print("::error::Issue body is empty")
+              sys.exit(1)
+
+          # Limit issue body size to prevent DoS (max 100KB)
+          MAX_BODY_SIZE = 100 * 1024
+          if len(issue_body) > MAX_BODY_SIZE:
+              print(f"::error::Issue body exceeds maximum size of {MAX_BODY_SIZE} bytes")
+              sys.exit(1)
+
           # Extract YAML from code block
           yaml_match = re.search(r'```ya?ml\s*(.*?)\s*```', issue_body, re.DOTALL)
           if not yaml_match:
               print("::error::No YAML code block found in issue body")
               sys.exit(1)
-          
+
           yaml_content = yaml_match.group(1).strip()
-          
+
+          # Limit YAML content size
+          MAX_YAML_SIZE = 50 * 1024
+          if len(yaml_content) > MAX_YAML_SIZE:
+              print(f"::error::YAML content exceeds maximum size of {MAX_YAML_SIZE} bytes")
+              sys.exit(1)
+
           try:
               data = yaml.safe_load(yaml_content)
           except yaml.YAMLError as e:
               print(f"::error::Invalid YAML syntax: {e}")
               sys.exit(1)
-          
+
+          if not isinstance(data, dict):
+              print("::error::YAML must be a dictionary/mapping")
+              sys.exit(1)
+
           errors = []
           warnings = []
-          
+
           # Required fields
           required = ['name', 'author', 'description', 'content_type', 'query']
           missing = [f for f in required if f not in data or not data[f]]
           if missing:
               errors.append(f"Missing required fields: {', '.join(missing)}")
-          
+
           # Validate content_type
           valid_types = ['bioc', 'correlation', 'hunting', 'hygiene', 'widget']
           content_type = data.get('content_type', '')
           if content_type not in valid_types:
               errors.append(f"Invalid content_type '{content_type}'. Must be one of: {valid_types}")
-          
+
           # BIOC-specific validation
           if content_type == 'bioc':
               query = data.get('query', '').lower()
               if 'xdr_data' not in query and 'cloud_audit_log' not in query:
                   errors.append("BIOC rules must use xdr_data or cloud_audit_log dataset")
-              
+
               if 'event_type' not in query:
                   warnings.append("BIOC rules should filter on event_type")
-              
+
               mitre_ids = data.get('mitre_ids', [])
               if len(mitre_ids) > 3:
                   errors.append("BIOC rules support maximum 3 MITRE techniques")
-          
+
           # Widget-specific validation
           if content_type == 'widget':
               query = data.get('query', '').lower()
               if '| view' not in query:
                   warnings.append("Widget queries should include a | view statement for visualization")
-          
+
           # Validate MITRE IDs
           for mid in data.get('mitre_ids', []):
-              if not re.match(r'^T\d{4}(\.\d{3})?$', mid):
+              if not isinstance(mid, str):
+                  errors.append(f"MITRE ID must be a string, got: {type(mid).__name__}")
+              elif not re.match(r'^T\d{4}(\.\d{3})?$', mid):
                   errors.append(f"Invalid MITRE technique ID format: {mid}")
-          
+
           # Generate output
           if errors:
               print("VALIDATION_STATUS=failed")
               print(f"ERRORS={'; '.join(errors)}")
               sys.exit(1)
           else:
-              # Generate filename
+              # Generate filename (sanitize to prevent path traversal)
               name = data.get('name', 'unnamed')
               filename = re.sub(r'[^a-z0-9]+', '_', name.lower()).strip('_')
-              
+              # Additional sanitization
+              filename = filename[:100]  # Limit length
+              if not filename:
+                  filename = 'unnamed_query'
+
               with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
                   f.write(f"filename={filename}\n")
                   f.write(f"content_type={content_type}\n")
                   f.write(f"warnings={'; '.join(warnings)}\n")
-              
+
               print("✅ Validation passed!")
               if warnings:
                   print(f"⚠️ Warnings: {'; '.join(warnings)}")
-          EOF
+          PYTHON_SCRIPT
 
       - name: Add validated label
         if: success()
@@ -112,14 +154,14 @@ jobs:
         with:
           script: |
             const warnings = '${{ steps.validate.outputs.warnings }}';
-            
+
             await github.rest.issues.addLabels({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
               labels: ['status: validated', 'type: ${{ steps.validate.outputs.content_type }}']
             });
-            
+
             // Remove pending-review if present
             try {
               await github.rest.issues.removeLabel({
@@ -129,17 +171,17 @@ jobs:
                 name: 'status: pending-review'
               });
             } catch (e) {}
-            
+
             let body = '✅ **Validation Passed!**\n\nYour contribution has been validated and is ready for maintainer review.\n\n';
             body += `**Filename:** \`${{ steps.validate.outputs.filename }}.yaml\`\n`;
             body += `**Content Type:** ${{ steps.validate.outputs.content_type }}\n`;
-            
+
             if (warnings) {
               body += `\n⚠️ **Warnings:**\n${warnings.split('; ').map(w => `- ${w}`).join('\n')}\n`;
             }
-            
+
             body += '\n---\n*A maintainer will review your contribution shortly. Thank you for contributing to XQL Hub!* 🎉';
-            
+
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -158,7 +200,7 @@ jobs:
               issue_number: context.issue.number,
               labels: ['status: needs-changes']
             });
-            
+
             // Remove pending-review if present
             try {
               await github.rest.issues.removeLabel({
@@ -168,23 +210,23 @@ jobs:
                 name: 'status: pending-review'
               });
             } catch (e) {}
-            
+
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
               body: `❌ **Validation Failed**
-            
+
             Please check the workflow logs and fix the issues mentioned above.
-            
+
             **Common issues:**
             - Missing required fields (name, author, description, content_type, query)
             - Invalid content_type (must be: bioc, correlation, hunting, hygiene, widget)
             - BIOC rules must use \`xdr_data\` or \`cloud_audit_log\` dataset
             - Invalid MITRE technique ID format (should be like T1059 or T1059.001)
-            
+
             Please edit your issue to fix these problems and the validation will run again automatically.
-            
+
             ---
             *Need help? Check our [contribution guide](https://github.com/intrusus-dev/xql-hub/blob/main/CONTRIBUTING.md) or use the [contribution wizard](https://xql-hub.com/contribute).*`
             });
