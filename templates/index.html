@@ -6,6 +6,8 @@
     <title>XQL Hub</title>
     <link rel="stylesheet" href="/static/style.css">
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <!-- CSP meta tag for additional XSS protection -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com;">
 </head>
 <body>
 
@@ -15,7 +17,8 @@
             <div class="search-bar">
                 <input type="text" name="q" id="search-input"
                        placeholder="Search queries..."
-                       oninput="onFilterChange()">
+                       maxlength="500"
+                       autocomplete="off">
             </div>
             <a href="/contribute" class="contribute-btn">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -34,8 +37,8 @@
                 <h4 class="sidebar-title">Filters</h4>
 
                 <div class="filter-group">
-                    <label>Content Type</label>
-                    <select name="content_type" id="filter-content-type" class="filter-select" onchange="onFilterChange()">
+                    <label for="filter-content-type">Content Type</label>
+                    <select name="content_type" id="filter-content-type" class="filter-select">
                         <option value="all">All Types</option>
                         {% for t in filters.types %}
                         <option value="{{ t }}">
@@ -52,8 +55,8 @@
                 </div>
 
                 <div class="filter-group">
-                    <label>Log Source</label>
-                    <select name="log_source" id="filter-log-source" class="filter-select" onchange="onFilterChange()">
+                    <label for="filter-log-source">Log Source</label>
+                    <select name="log_source" id="filter-log-source" class="filter-select">
                         <option value="all">All Log Sources</option>
                         {% for ls in filters.log_sources %}
                         <option value="{{ ls }}">{{ ls }}</option>
@@ -62,8 +65,8 @@
                 </div>
 
                 <div class="filter-group">
-                    <label>Sort By</label>
-                    <select name="sort_by" id="filter-sort" class="filter-select" onchange="onFilterChange()">
+                    <label for="filter-sort">Sort By</label>
+                    <select name="sort_by" id="filter-sort" class="filter-select">
                         <option value="name">Name (A-Z)</option>
                         <option value="name-desc">Name (Z-A)</option>
                         <option value="severity">Severity (High first)</option>
@@ -73,7 +76,7 @@
             </div>
 
             <div class="sidebar-section">
-                <button type="button" class="clear-filters-btn" onclick="clearAllFilters()">
+                <button type="button" class="clear-filters-btn" id="clear-filters-btn">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M3 6h18M6 6v14a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V6M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/>
                     </svg>
@@ -131,14 +134,167 @@
     </div>
 
     <script>
-        // All queries from the database (for dynamic filtering)
-        const allQueries = {{ queries | tojson | safe }};
+    (function() {
+        'use strict';
 
-        // MITRE ATT&CK data with proper many-to-many tactic mappings (from mitre_data.json)
-        const mitreData = {{ mitre_data | tojson | safe }};
+        // =============================================================================
+        // SECURITY UTILITIES
+        // =============================================================================
 
-        // Tactic definitions with full names
-        const tactics = [
+        /**
+         * Validates a MITRE technique ID format
+         * @param {string} id - The ID to validate
+         * @returns {boolean} - True if valid format
+         */
+        function isValidMitreId(id) {
+            if (typeof id !== 'string') return false;
+            // Strict pattern: T followed by 4 digits, optionally .3 digits
+            return /^T\d{4}(\.\d{3})?$/.test(id);
+        }
+
+        /**
+         * Validates a MITRE tactic ID format
+         * @param {string} id - The ID to validate
+         * @returns {boolean} - True if valid format
+         */
+        function isValidTacticId(id) {
+            if (typeof id !== 'string') return false;
+            // Pattern: TA followed by 4 digits
+            return /^TA\d{4}$/.test(id);
+        }
+
+        /**
+         * Sanitizes a string for safe use in text content
+         * @param {*} input - The input to sanitize
+         * @returns {string} - Sanitized string
+         */
+        function sanitizeText(input) {
+            if (input === null || input === undefined) return '';
+            return String(input);
+        }
+
+        /**
+         * Escapes HTML entities to prevent XSS when inserting into HTML
+         * @param {string} text - The text to escape
+         * @returns {string} - Escaped text
+         */
+        function escapeHtml(text) {
+            const str = sanitizeText(text);
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        /**
+         * Creates a text node safely
+         * @param {string} text - The text content
+         * @returns {Text} - Text node
+         */
+        function createTextNode(text) {
+            return document.createTextNode(sanitizeText(text));
+        }
+
+        /**
+         * Safely gets an element by ID with validation
+         * @param {string} id - Element ID
+         * @returns {Element|null} - The element or null
+         */
+        function getElement(id) {
+            if (typeof id !== 'string' || !id) {
+                console.warn('Invalid element ID provided');
+                return null;
+            }
+            return document.getElementById(id);
+        }
+
+        /**
+         * Safely gets an element's value
+         * @param {string} id - Element ID
+         * @param {string} defaultValue - Default value if element not found
+         * @returns {string} - The value
+         */
+        function getElementValue(id, defaultValue) {
+            if (defaultValue === undefined) defaultValue = '';
+            var el = getElement(id);
+            return el ? (el.value || defaultValue) : defaultValue;
+        }
+
+        /**
+         * Safely query elements by attribute with validated value
+         * @param {string} attr - Attribute name
+         * @param {string} value - Attribute value (will be validated/escaped)
+         * @returns {NodeList} - Matching elements
+         */
+        function queryByAttribute(attr, value) {
+            if (typeof attr !== 'string' || typeof value !== 'string') {
+                return [];
+            }
+            try {
+                // CSS.escape handles special characters safely
+                var selector = '[' + CSS.escape(attr) + '="' + CSS.escape(value) + '"]';
+                return document.querySelectorAll(selector);
+            } catch (e) {
+                console.error('Query selector error:', e);
+                return [];
+            }
+        }
+
+        // =============================================================================
+        // DATA INITIALIZATION WITH VALIDATION
+        // =============================================================================
+
+        // Parse and validate queries from server
+        var allQueries = (function() {
+            try {
+                var data = {{ queries | tojson }};
+                if (!Array.isArray(data)) {
+                    console.error('Queries data is not an array');
+                    return [];
+                }
+                // Validate each query has expected structure
+                return data.filter(function(q) {
+                    return q && typeof q === 'object' &&
+                           typeof q.name === 'string' &&
+                           typeof q.content_type === 'string';
+                });
+            } catch (e) {
+                console.error('Failed to parse queries data:', e);
+                return [];
+            }
+        })();
+
+        // Parse and validate MITRE data from server
+        var mitreData = (function() {
+            try {
+                var data = {{ mitre_data | tojson }};
+                if (!data || typeof data !== 'object' || Array.isArray(data)) {
+                    console.error('MITRE data is not a valid object');
+                    return {};
+                }
+                // Validate structure - should be {techniqueId: {name, tactic_ids}}
+                var validated = {};
+                for (var key in data) {
+                    if (data.hasOwnProperty(key) && isValidMitreId(key)) {
+                        var value = data[key];
+                        if (value && typeof value === 'object') {
+                            validated[key] = {
+                                name: typeof value.name === 'string' ? value.name : key,
+                                tactic_ids: Array.isArray(value.tactic_ids)
+                                    ? value.tactic_ids.filter(isValidTacticId)
+                                    : []
+                            };
+                        }
+                    }
+                }
+                return validated;
+            } catch (e) {
+                console.error('Failed to parse MITRE data:', e);
+                return {};
+            }
+        })();
+
+        // Tactic definitions (static, trusted data)
+        var tactics = [
             { id: 'TA0043', name: 'Reconnaissance', shortname: 'Reconnaissance' },
             { id: 'TA0042', name: 'Resource Development', shortname: 'Resource Dev' },
             { id: 'TA0001', name: 'Initial Access', shortname: 'Initial Access' },
@@ -152,90 +308,137 @@
             { id: 'TA0009', name: 'Collection', shortname: 'Collection' },
             { id: 'TA0011', name: 'Command and Control', shortname: 'C2' },
             { id: 'TA0010', name: 'Exfiltration', shortname: 'Exfiltration' },
-            { id: 'TA0040', name: 'Impact', shortname: 'Impact' },
+            { id: 'TA0040', name: 'Impact', shortname: 'Impact' }
         ];
+        Object.freeze(tactics);
 
-        // Build technique to tactic mapping from MITRE data (supports many-to-many relationships)
+        // =============================================================================
+        // STATE MANAGEMENT
+        // =============================================================================
+
+        // Use Sets for efficient lookups
+        var selectedMitre = new Set();
+        var expandedTactics = new Set();
+
+        // =============================================================================
+        // MITRE DATA FUNCTIONS
+        // =============================================================================
+
+        /**
+         * Get tactic IDs for a technique (supports many-to-many)
+         */
         function getTacticIdsForTechnique(techniqueId) {
-            const baseId = techniqueId.split('.')[0];
-            const mitreEntry = mitreData[techniqueId] || mitreData[baseId];
-            return mitreEntry ? mitreEntry.tactic_ids : [];
+            if (!isValidMitreId(techniqueId)) return [];
+            var baseId = techniqueId.split('.')[0];
+            var entry = mitreData[techniqueId] || mitreData[baseId];
+            return entry ? entry.tactic_ids : [];
         }
 
-        // Get technique name from MITRE data
+        /**
+         * Get technique name from MITRE data
+         */
         function getTechniqueName(techniqueId) {
-            const mitreEntry = mitreData[techniqueId];
-            if (mitreEntry && mitreEntry.name) {
-                return mitreEntry.name;
-            }
-            // Fallback to base technique name
-            const baseId = techniqueId.split('.')[0];
-            const baseEntry = mitreData[baseId];
-            if (baseEntry && baseEntry.name) {
-                return baseEntry.name;
-            }
+            if (!isValidMitreId(techniqueId)) return escapeHtml(techniqueId);
+            var entry = mitreData[techniqueId];
+            if (entry && entry.name) return entry.name;
+            var baseId = techniqueId.split('.')[0];
+            var baseEntry = mitreData[baseId];
+            if (baseEntry && baseEntry.name) return baseEntry.name;
             return techniqueId;
         }
 
-        // Selected MITRE techniques
-        let selectedMitre = new Set();
-        let expandedTactics = new Set();
-        let selectedTag = null;
-
-        // Get currently filtered queries based on dropdown selections
+        /**
+         * Get currently filtered queries based on dropdown selections
+         */
         function getFilteredQueries() {
-            const contentType = document.getElementById('filter-content-type')?.value || 'all';
-            const logSource = document.getElementById('filter-log-source')?.value || 'all';
-            const searchQuery = document.getElementById('search-input')?.value?.toLowerCase() || '';
+            var contentType = getElementValue('filter-content-type', 'all');
+            var logSource = getElementValue('filter-log-source', 'all');
+            var searchQuery = getElementValue('search-input', '').toLowerCase().slice(0, 500);
 
-            return allQueries.filter(q => {
+            return allQueries.filter(function(q) {
                 if (contentType !== 'all' && q.content_type !== contentType) return false;
-                if (logSource !== 'all' && !(q.log_sources || []).includes(logSource)) return false;
-                if (searchQuery && !JSON.stringify(q).toLowerCase().includes(searchQuery)) return false;
+                if (logSource !== 'all') {
+                    var sources = Array.isArray(q.log_sources) ? q.log_sources : [];
+                    if (sources.indexOf(logSource) === -1) return false;
+                }
+                if (searchQuery) {
+                    var tags = Array.isArray(q.tags) ? q.tags : [];
+                    var searchableText = [
+                        q.name || '',
+                        q.description || '',
+                        q.author || ''
+                    ].concat(tags).join(' ').toLowerCase();
+                    if (searchableText.indexOf(searchQuery) === -1) return false;
+                }
                 return true;
             });
         }
 
-        // Get MITRE IDs from filtered queries
+        /**
+         * Get MITRE IDs from filtered queries
+         */
         function getMitreFromFilteredQueries() {
-            const filtered = getFilteredQueries();
-            const mitreIds = new Set();
-            filtered.forEach(q => {
-                (q.mitre_ids || []).forEach(mid => mitreIds.add(mid));
+            var filtered = getFilteredQueries();
+            var mitreIds = new Set();
+            filtered.forEach(function(q) {
+                var ids = Array.isArray(q.mitre_ids) ? q.mitre_ids : [];
+                ids.forEach(function(mid) {
+                    if (isValidMitreId(mid)) {
+                        mitreIds.add(mid);
+                    }
+                });
             });
             return Array.from(mitreIds);
         }
 
-        // Count queries matching a specific technique (base or subtechnique)
+        /**
+         * Count queries matching a specific technique
+         */
         function countQueriesForTechnique(techniqueId) {
-            const filtered = getFilteredQueries();
-            return filtered.filter(q => {
-                const queryMitre = q.mitre_ids || [];
-                return queryMitre.some(mid => mid === techniqueId || mid.startsWith(techniqueId + '.'));
+            if (!isValidMitreId(techniqueId)) return 0;
+            var filtered = getFilteredQueries();
+            return filtered.filter(function(q) {
+                var queryMitre = Array.isArray(q.mitre_ids) ? q.mitre_ids : [];
+                return queryMitre.some(function(mid) {
+                    return isValidMitreId(mid) && (mid === techniqueId || mid.indexOf(techniqueId + '.') === 0);
+                });
             }).length;
         }
 
-        // Build/rebuild the MITRE matrix based on current filters
+        // =============================================================================
+        // DOM BUILDING FUNCTIONS (Using safe DOM methods)
+        // =============================================================================
+
+        /**
+         * Build the MITRE matrix based on current filters
+         */
         function buildMitreMatrix() {
-            const availableMitre = getMitreFromFilteredQueries();
-            const tacticCounts = {};
-            const tacticTechniques = {};
-            const uniqueTechniques = new Set(); // Track unique base techniques globally
+            var tacticsRow = getElement('tactics-row');
+            if (!tacticsRow) {
+                console.error('tactics-row element not found');
+                return;
+            }
+
+            var availableMitre = getMitreFromFilteredQueries();
+            var tacticCounts = {};
+            var tacticTechniques = {};
+            var uniqueTechniques = new Set();
 
             // Initialize all tactics
-            tactics.forEach(t => {
+            tactics.forEach(function(t) {
                 tacticCounts[t.id] = 0;
                 tacticTechniques[t.id] = new Map();
             });
 
-            // Group techniques by tactic (MANY-TO-MANY: each technique can appear in multiple tactics)
-            availableMitre.forEach(mid => {
-                const baseId = mid.split('.')[0];
-                uniqueTechniques.add(baseId); // Track unique base techniques
-                const tacticIds = getTacticIdsForTechnique(mid);
+            // Group techniques by tactic
+            availableMitre.forEach(function(mid) {
+                if (!isValidMitreId(mid)) return;
+                var baseId = mid.split('.')[0];
+                uniqueTechniques.add(baseId);
+                var tacticIds = getTacticIdsForTechnique(mid);
 
-                // Add this technique to ALL tactics it belongs to
-                tacticIds.forEach(tacticId => {
+                tacticIds.forEach(function(tacticId) {
+                    if (!isValidTacticId(tacticId)) return;
                     if (!tacticTechniques[tacticId]) {
                         tacticTechniques[tacticId] = new Map();
                     }
@@ -247,86 +450,125 @@
             });
 
             // Count unique techniques per tactic
-            Object.keys(tacticTechniques).forEach(tacticId => {
+            Object.keys(tacticTechniques).forEach(function(tacticId) {
                 tacticCounts[tacticId] = tacticTechniques[tacticId].size;
             });
 
-            // Build the UI
-            const tacticsRow = document.getElementById('tactics-row');
+            // Clear and rebuild the UI using safe DOM methods
             tacticsRow.innerHTML = '';
+            var totalTactics = 0;
 
-            let totalTactics = 0;
-
-            tactics.forEach(tactic => {
-                const count = tacticCounts[tactic.id];
-                const techniques = tacticTechniques[tactic.id];
-
+            tactics.forEach(function(tactic) {
+                var count = tacticCounts[tactic.id] || 0;
+                var techniques = tacticTechniques[tactic.id];
                 if (count > 0) totalTactics++;
 
-                const column = document.createElement('div');
+                var column = document.createElement('div');
                 column.className = 'tactic-column';
-                column.dataset.tacticId = tactic.id;
+                column.setAttribute('data-tactic-id', tactic.id);
 
-                const hasQueries = count > 0;
-                const isExpanded = expandedTactics.has(tactic.id);
+                var hasQueries = count > 0;
+                var isExpanded = expandedTactics.has(tactic.id);
 
-                column.innerHTML = `
-                    <div class="tactic-header ${hasQueries ? 'has-queries' : ''} ${isExpanded ? 'expanded' : ''}" onclick="toggleTactic('${tactic.id}')">
-                        <span class="tactic-count ${hasQueries ? 'has-queries' : 'zero'}">${count}</span>
-                        <span class="tactic-name">${tactic.shortname}</span>
-                        <span class="tactic-id">${tactic.id}</span>
-                        ${hasQueries ? '<span class="tactic-expand-indicator">▼</span>' : ''}
-                    </div>
-                    <div class="techniques-panel ${isExpanded ? 'expanded' : ''}" id="panel-${tactic.id}">
-                        ${buildTechniquesPanel(techniques)}
-                    </div>
-                `;
+                // Build header using DOM methods (safer than innerHTML)
+                var header = document.createElement('div');
+                header.className = 'tactic-header' + (hasQueries ? ' has-queries' : '') + (isExpanded ? ' expanded' : '');
+                header.setAttribute('data-tactic-id', tactic.id);
 
+                var countSpan = document.createElement('span');
+                countSpan.className = 'tactic-count ' + (hasQueries ? 'has-queries' : 'zero');
+                countSpan.textContent = count;
+                header.appendChild(countSpan);
+
+                var nameSpan = document.createElement('span');
+                nameSpan.className = 'tactic-name';
+                nameSpan.textContent = tactic.shortname;
+                header.appendChild(nameSpan);
+
+                var idSpan = document.createElement('span');
+                idSpan.className = 'tactic-id';
+                idSpan.textContent = tactic.id;
+                header.appendChild(idSpan);
+
+                if (hasQueries) {
+                    var indicator = document.createElement('span');
+                    indicator.className = 'tactic-expand-indicator';
+                    indicator.textContent = '▼';
+                    header.appendChild(indicator);
+                }
+
+                column.appendChild(header);
+
+                // Build techniques panel
+                var panel = document.createElement('div');
+                panel.className = 'techniques-panel' + (isExpanded ? ' expanded' : '');
+                panel.id = 'panel-' + tactic.id;
+
+                if (techniques && techniques.size > 0) {
+                    techniques.forEach(function(subtechniques, baseId) {
+                        if (!isValidMitreId(baseId)) return;
+
+                        var name = getTechniqueName(baseId);
+                        var queryCount = countQueriesForTechnique(baseId);
+                        var isSelected = selectedMitre.has(baseId);
+
+                        var card = document.createElement('div');
+                        card.className = 'technique-card' + (isSelected ? ' selected' : '');
+                        card.setAttribute('data-technique', baseId);
+                        card.title = name + ' (' + baseId + ')';
+
+                        var cardHeader = document.createElement('div');
+                        cardHeader.className = 'technique-card-header';
+
+                        var cardName = document.createElement('span');
+                        cardName.className = 'technique-card-name';
+                        cardName.textContent = name;
+                        cardHeader.appendChild(cardName);
+
+                        var cardCount = document.createElement('span');
+                        cardCount.className = 'technique-card-count';
+                        cardCount.textContent = queryCount;
+                        cardHeader.appendChild(cardCount);
+
+                        card.appendChild(cardHeader);
+
+                        var cardId = document.createElement('span');
+                        cardId.className = 'technique-card-id';
+                        cardId.textContent = baseId;
+                        card.appendChild(cardId);
+
+                        panel.appendChild(card);
+                    });
+                }
+
+                column.appendChild(panel);
                 tacticsRow.appendChild(column);
             });
 
-            // Update stats with UNIQUE technique count
-            document.getElementById('tactic-count').textContent = totalTactics;
-            document.getElementById('technique-count').textContent = uniqueTechniques.size;
-            document.getElementById('total-queries').textContent = getFilteredQueries().length;
+            // Update stats
+            var tacticCountEl = getElement('tactic-count');
+            var techniqueCountEl = getElement('technique-count');
+            var totalQueriesEl = getElement('total-queries');
 
-            // Re-apply selected state to technique cards
-            selectedMitre.forEach(mid => {
-                const cards = document.querySelectorAll(`[data-technique="${mid}"]`);
-                cards.forEach(c => c.classList.add('selected'));
-            });
+            if (tacticCountEl) tacticCountEl.textContent = totalTactics;
+            if (techniqueCountEl) techniqueCountEl.textContent = uniqueTechniques.size;
+            if (totalQueriesEl) totalQueriesEl.textContent = getFilteredQueries().length;
         }
 
-        function buildTechniquesPanel(techniques) {
-            if (!techniques || techniques.size === 0) return '';
-
-            let html = '';
-            techniques.forEach((subtechniques, baseId) => {
-                const name = getTechniqueName(baseId);
-                // Count actual queries, not subtechniques
-                const queryCount = countQueriesForTechnique(baseId);
-                const isSelected = selectedMitre.has(baseId);
-
-                html += `
-                    <div class="technique-card ${isSelected ? 'selected' : ''}" data-technique="${baseId}" onclick="toggleTechnique('${baseId}')" title="${name} (${baseId})">
-                        <div class="technique-card-header">
-                            <span class="technique-card-name">${name}</span>
-                            <span class="technique-card-count">${queryCount}</span>
-                        </div>
-                        <span class="technique-card-id">${baseId}</span>
-                    </div>
-                `;
-            });
-
-            return html;
-        }
-
+        /**
+         * Toggle a tactic's expanded state
+         */
         function toggleTactic(tacticId) {
-            const column = document.querySelector(`[data-tactic-id="${tacticId}"]`);
-            const header = column.querySelector('.tactic-header');
-            const panel = document.getElementById(`panel-${tacticId}`);
+            if (!isValidTacticId(tacticId)) return;
 
-            if (!header.classList.contains('has-queries')) return;
+            var columns = queryByAttribute('data-tactic-id', tacticId);
+            if (columns.length === 0) return;
+
+            var column = columns[0];
+            var header = column.querySelector('.tactic-header');
+            var panel = getElement('panel-' + tacticId);
+
+            if (!header || !panel || !header.classList.contains('has-queries')) return;
 
             if (expandedTactics.has(tacticId)) {
                 expandedTactics.delete(tacticId);
@@ -339,93 +581,247 @@
             }
         }
 
+        /**
+         * Toggle a technique's selected state
+         */
         function toggleTechnique(techniqueId) {
-            const cards = document.querySelectorAll(`[data-technique="${techniqueId}"]`);
+            if (!isValidMitreId(techniqueId)) return;
+
+            var cards = queryByAttribute('data-technique', techniqueId);
 
             if (selectedMitre.has(techniqueId)) {
                 selectedMitre.delete(techniqueId);
-                cards.forEach(c => c.classList.remove('selected'));
+                Array.prototype.forEach.call(cards, function(c) {
+                    c.classList.remove('selected');
+                });
             } else {
                 selectedMitre.add(techniqueId);
-                cards.forEach(c => c.classList.add('selected'));
+                Array.prototype.forEach.call(cards, function(c) {
+                    c.classList.add('selected');
+                });
             }
 
             updateSelectedDisplay();
             triggerSearch();
         }
 
-        function filterByTag(tag) {
-            selectedTag = tag;
-            document.getElementById('search-input').value = tag;
-            onFilterChange();
-        }
-
+        /**
+         * Update the selected techniques display
+         */
         function updateSelectedDisplay() {
-            const display = document.getElementById('selected-display');
-            const tagsContainer = document.getElementById('selected-tags');
+            var display = getElement('selected-display');
+            var tagsContainer = getElement('selected-tags');
+
+            if (!display || !tagsContainer) return;
 
             if (selectedMitre.size === 0) {
                 display.classList.remove('has-selection');
                 tagsContainer.innerHTML = '';
             } else {
                 display.classList.add('has-selection');
-                tagsContainer.innerHTML = Array.from(selectedMitre).map(mid => {
-                    const name = getTechniqueName(mid);
-                    return `<span class="selected-tag" onclick="toggleTechnique('${mid}')">${name} <span class="remove">×</span></span>`;
-                }).join('');
+                tagsContainer.innerHTML = '';
+
+                selectedMitre.forEach(function(mid) {
+                    if (!isValidMitreId(mid)) return;
+
+                    var name = getTechniqueName(mid);
+                    var tag = document.createElement('span');
+                    tag.className = 'selected-tag';
+                    tag.setAttribute('data-technique', mid);
+                    tag.textContent = name + ' ';
+
+                    var removeSpan = document.createElement('span');
+                    removeSpan.className = 'remove';
+                    removeSpan.textContent = '×';
+                    tag.appendChild(removeSpan);
+
+                    tagsContainer.appendChild(tag);
+                });
             }
         }
 
+        /**
+         * Clear all filters and selections
+         */
         function clearAllFilters() {
-            // Clear MITRE selection
             selectedMitre.clear();
-            selectedTag = null;
-            document.querySelectorAll('.technique-card.selected').forEach(el => {
+            expandedTactics.clear();
+
+            var cards = document.querySelectorAll('.technique-card.selected');
+            Array.prototype.forEach.call(cards, function(el) {
                 el.classList.remove('selected');
             });
 
-            // Reset dropdowns
-            document.getElementById('filter-content-type').value = 'all';
-            document.getElementById('filter-log-source').value = 'all';
-            document.getElementById('filter-sort').value = 'name';
-            document.getElementById('search-input').value = '';
+            var contentTypeEl = getElement('filter-content-type');
+            var logSourceEl = getElement('filter-log-source');
+            var sortEl = getElement('filter-sort');
+            var searchEl = getElement('search-input');
+
+            if (contentTypeEl) contentTypeEl.value = 'all';
+            if (logSourceEl) logSourceEl.value = 'all';
+            if (sortEl) sortEl.value = 'name';
+            if (searchEl) searchEl.value = '';
 
             updateSelectedDisplay();
             buildMitreMatrix();
             triggerSearch();
         }
 
+        /**
+         * Handle filter changes
+         */
         function onFilterChange() {
-            // Rebuild MITRE matrix based on new filter state
             buildMitreMatrix();
             triggerSearch();
         }
 
+        /**
+         * Trigger HTMX search with current filters
+         */
         function triggerSearch() {
-            const params = new URLSearchParams();
+            var params = new URLSearchParams();
 
-            const q = document.getElementById('search-input')?.value || '';
+            var q = getElementValue('search-input', '').slice(0, 500);
             if (q) params.append('q', q);
 
-            const contentType = document.getElementById('filter-content-type')?.value || 'all';
-            if (contentType !== 'all') params.append('content_type', contentType);
+            var contentType = getElementValue('filter-content-type', 'all');
+            if (contentType && contentType !== 'all') params.append('content_type', contentType);
 
-            const logSource = document.getElementById('filter-log-source')?.value || 'all';
-            if (logSource !== 'all') params.append('log_source', logSource);
+            var logSource = getElementValue('filter-log-source', 'all');
+            if (logSource && logSource !== 'all') params.append('log_source', logSource);
 
-            const sortBy = document.getElementById('filter-sort')?.value || 'name';
+            var sortBy = getElementValue('filter-sort', 'name');
             params.append('sort_by', sortBy);
 
-            selectedMitre.forEach(mid => params.append('mitre', mid));
+            selectedMitre.forEach(function(mid) {
+                if (isValidMitreId(mid)) {
+                    params.append('mitre', mid);
+                }
+            });
 
-            htmx.ajax('GET', `/search?${params.toString()}`, '#results-grid');
+            // Check if htmx is available
+            if (typeof htmx !== 'undefined' && htmx.ajax) {
+                htmx.ajax('GET', '/search?' + params.toString(), '#results-grid');
+            } else {
+                console.warn('htmx not available, falling back to page reload');
+                window.location.href = '/search?' + params.toString();
+            }
         }
 
-        // Initialize on load
-        document.addEventListener('DOMContentLoaded', () => {
-            buildMitreMatrix();
-            triggerSearch();  // Trigger search on load to apply default sorting
+        /**
+         * Filter by tag (called from query cards)
+         */
+        function filterByTag(tag) {
+            var searchEl = getElement('search-input');
+            if (searchEl && typeof tag === 'string') {
+                searchEl.value = tag.slice(0, 500);
+                onFilterChange();
+            }
+        }
+
+        /**
+         * Filter by log source (called from query cards)
+         */
+        function filterByLogSource(logSource) {
+            var logSourceEl = getElement('filter-log-source');
+            if (logSourceEl && typeof logSource === 'string') {
+                // Only set if it's a valid option
+                var options = Array.from(logSourceEl.options);
+                var validOption = options.find(function(opt) {
+                    return opt.value === logSource;
+                });
+                if (validOption) {
+                    logSourceEl.value = logSource;
+                    onFilterChange();
+                }
+            }
+        }
+
+        // =============================================================================
+        // EVENT LISTENERS (Using delegation for dynamic content)
+        // =============================================================================
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize
+            try {
+                buildMitreMatrix();
+                triggerSearch();
+            } catch (e) {
+                console.error('Error initializing MITRE matrix:', e);
+            }
+
+            // Event delegation for tactics row
+            var tacticsRow = getElement('tactics-row');
+            if (tacticsRow) {
+                tacticsRow.addEventListener('click', function(e) {
+                    // Handle tactic header clicks
+                    var header = e.target.closest('.tactic-header');
+                    if (header) {
+                        var tacticId = header.getAttribute('data-tactic-id');
+                        if (tacticId) {
+                            toggleTactic(tacticId);
+                            return;
+                        }
+                    }
+
+                    // Handle technique card clicks
+                    var card = e.target.closest('.technique-card');
+                    if (card) {
+                        var techniqueId = card.getAttribute('data-technique');
+                        if (techniqueId) {
+                            toggleTechnique(techniqueId);
+                            return;
+                        }
+                    }
+                });
+            }
+
+            // Event delegation for selected tags
+            var selectedTags = getElement('selected-tags');
+            if (selectedTags) {
+                selectedTags.addEventListener('click', function(e) {
+                    var tag = e.target.closest('.selected-tag');
+                    if (tag) {
+                        var techniqueId = tag.getAttribute('data-technique');
+                        if (techniqueId) {
+                            toggleTechnique(techniqueId);
+                        }
+                    }
+                });
+            }
+
+            // Filter change listeners
+            var filterElements = ['filter-content-type', 'filter-log-source', 'filter-sort'];
+            filterElements.forEach(function(id) {
+                var el = getElement(id);
+                if (el) {
+                    el.addEventListener('change', onFilterChange);
+                }
+            });
+
+            // Search input with debounce
+            var searchInput = getElement('search-input');
+            if (searchInput) {
+                var debounceTimer;
+                searchInput.addEventListener('input', function() {
+                    clearTimeout(debounceTimer);
+                    debounceTimer = setTimeout(onFilterChange, 300);
+                });
+            }
+
+            // Clear filters button
+            var clearBtn = getElement('clear-filters-btn');
+            if (clearBtn) {
+                clearBtn.addEventListener('click', clearAllFilters);
+            }
         });
+
+        // Expose necessary functions to global scope for query cards partial
+        window.filterByTag = filterByTag;
+        window.filterByLogSource = filterByLogSource;
+        window.onFilterChange = onFilterChange;
+
+    })();
     </script>
 
 </body>
