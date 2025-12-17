@@ -49,10 +49,14 @@ MAX_CONTENT_TYPE_LENGTH = 50
 MAX_MITRE_ID_LENGTH = 20
 MAX_MITRE_IDS_COUNT = 50
 MAX_LOG_SOURCE_LENGTH = 100
+MAX_SORT_OPTION_LENGTH = 20
 
 # Allowed values (Allowlist approach)
 VALID_CONTENT_TYPES = frozenset(["bioc", "correlation", "hunting", "hygiene", "widget", "xql"])
 VALID_SORT_OPTIONS = frozenset(["name", "name-desc", "severity", "type"])
+
+# Webhook event types that trigger content refresh
+ALLOWED_WEBHOOK_EVENTS = frozenset({"push", "workflow_run", "ping"})
 
 # Regex patterns for validation
 MITRE_ID_PATTERN = re.compile(r"^T\d{4}(\.\d{3})?$")
@@ -83,18 +87,26 @@ CONTENT_TYPE_LABELS = {
 # =============================================================================
 # INPUT VALIDATION FUNCTIONS
 # =============================================================================
-def sanitize_string(value: str, max_length: int = 500, allow_empty: bool = True) -> str:
+def sanitize_string(value: str, max_length: int = 500, allow_empty: bool = True) -> Optional[str]:
     """
     Sanitize a string input by trimming and limiting length.
-    Returns empty string if input is invalid.
+
+    Args:
+        value: The string to sanitize
+        max_length: Maximum allowed length (truncates if exceeded)
+        allow_empty: If False, returns None for empty strings
+
+    Returns:
+        Sanitized string, or None if input is invalid/empty (when allow_empty=False)
     """
     if not isinstance(value, str):
-        return ""
+        logger.debug(f"sanitize_string received non-string type: {type(value).__name__}")
+        return None
 
     value = value.strip()
 
     if not allow_empty and not value:
-        return ""
+        return None
 
     # Limit length
     if len(value) > max_length:
@@ -105,7 +117,10 @@ def sanitize_string(value: str, max_length: int = 500, allow_empty: bool = True)
 
 def validate_content_type(content_type: str) -> str:
     # Validate content type against allowlist.
-    content_type = sanitize_string(content_type, MAX_CONTENT_TYPE_LENGTH).lower()
+    sanitized = sanitize_string(content_type, MAX_CONTENT_TYPE_LENGTH)
+    if sanitized is None:
+        return "all"
+    content_type = sanitized.lower()
     if content_type and content_type != "all" and content_type not in VALID_CONTENT_TYPES:
         logger.warning(f"Invalid content_type received: {content_type[:50]}")
         return "all"
@@ -114,16 +129,23 @@ def validate_content_type(content_type: str) -> str:
 
 def validate_sort_option(sort_by: str) -> str:
     # Validate sort option against allowlist.
-    sort_by = sanitize_string(sort_by, 20).lower()
+    # Note: Membership check against VALID_SORT_OPTIONS is sufficient validation
+    sanitized = sanitize_string(sort_by, MAX_SORT_OPTION_LENGTH)
+    if sanitized is None:
+        return "name"
+    sort_by = sanitized.lower()
     if sort_by not in VALID_SORT_OPTIONS:
-        logger.warning(f"Invalid sort_by received: {sort_by[:20]}")
+        logger.warning(f"Invalid sort_by received: {sort_by}")
         return "name"
     return sort_by
 
 
 def validate_mitre_id(mitre_id: str) -> Optional[str]:
     """Validate a single MITRE ID format."""
-    mitre_id = sanitize_string(mitre_id, MAX_MITRE_ID_LENGTH).upper()
+    sanitized = sanitize_string(mitre_id, MAX_MITRE_ID_LENGTH)
+    if sanitized is None:
+        return None
+    mitre_id = sanitized.upper()
     if mitre_id and MITRE_ID_PATTERN.match(mitre_id):
         return mitre_id
     return None
@@ -148,7 +170,10 @@ def validate_mitre_ids(mitre_ids: List[str]) -> List[str]:
 
 def validate_log_source(log_source: str) -> str:
     """Validate log source against known values."""
-    log_source = sanitize_string(log_source, MAX_LOG_SOURCE_LENGTH)
+    sanitized = sanitize_string(log_source, MAX_LOG_SOURCE_LENGTH)
+    if sanitized is None:
+        return "all"
+    log_source = sanitized
 
     if log_source and log_source != "all":
         # Check against known log sources
@@ -187,10 +212,20 @@ def verify_github_signature(payload: bytes, signature: str) -> bool:
 def verify_git_repository() -> bool:
     """
     Verify we're in the expected git repository.
-    Returns True if verification passes or is not configured.
+
+    SECURITY: This check prevents Server-Side Request Forgery (SSRF) attacks where
+    an attacker could potentially configure the webhook to pull from a malicious
+    repository containing crafted YAML files or executable code. By verifying
+    the git remote URL matches our expected repository, we ensure that even if
+    the webhook endpoint is discovered or exposed, it can only pull from the
+    legitimate source repository.
+
+    Returns:
+        True if verification passes or is not configured (EXPECTED_REPO_URL empty).
+        False if the current git remote doesn't match the expected URL.
     """
     if not EXPECTED_REPO_URL:
-        # No verification configured
+        # No verification configured - allow (but log recommendation in strict mode)
         return True
 
     try:
@@ -482,7 +517,8 @@ async def search(
     """Search and filter queries with validated inputs."""
 
     # Validate and sanitize all inputs
-    search_query = sanitize_string(q, MAX_SEARCH_QUERY_LENGTH).lower()
+    sanitized_q = sanitize_string(q, MAX_SEARCH_QUERY_LENGTH)
+    search_query = sanitized_q.lower() if sanitized_q else ""
     content_type = validate_content_type(content_type)
     mitre_ids = validate_mitre_ids(mitre)
     log_source = validate_log_source(log_source)
@@ -600,9 +636,8 @@ async def refresh_content(
             detail="Invalid or missing webhook signature. Ensure GITHUB_WEBHOOK_SECRET is configured."
         )
 
-    # Only allow specific GitHub events
-    allowed_events = {"push", "workflow_run", "ping"}
-    if x_github_event and x_github_event not in allowed_events:
+    # Only allow specific GitHub events (empty string won't match any allowed event)
+    if x_github_event not in ALLOWED_WEBHOOK_EVENTS:
         logger.info(f"Ignoring webhook event: {x_github_event}")
         return {"status": "ignored", "message": f"Event '{x_github_event}' is not processed"}
 
