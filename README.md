@@ -91,6 +91,9 @@ alert_name: "Alert name with $dynamic_fields"
 xql-hub/
 ├── main.py                 # FastAPI application
 ├── requirements.txt        # Python dependencies
+├── docs/
+│   ├── SETUP.md           # Installation and deployment guide
+│   └── API.md             # API reference documentation
 ├── queries/                # Query YAML files
 │   ├── ad_privileged_groups_add.yaml
 │   ├── lsass_access.yaml
@@ -106,7 +109,8 @@ xql-hub/
 │   └── partials/
 │       └── query_cards.html
 ├── tools/
-│   └── update_mitre.py    # Script to update MITRE data
+│   ├── update_mitre.py           # Script to update MITRE data
+│   └── contribution_helper.py    # Shared helper for GitHub Actions
 └── .github/
     ├── workflows/         # CI/CD automation
     ├── ISSUE_TEMPLATE/    # Issue templates for contributions
@@ -115,35 +119,23 @@ xql-hub/
 
 ## Getting Started
 
-### Prerequisites
+For detailed installation and deployment instructions, see the **[Setup Guide](docs/SETUP.md)**.
 
-- Python 3.11+
-- pip
+For us, the most important thing is that you enjoy using it. We're looking to provide XQL Hub to every possible user of 
+the Cortex platform, no matter if you're a customer, partner, security analyst, or engineer. PANW employees are very 
+welcome to contribute, as well.
 
-### Installation
+Right now we're looking the most for query contributions. If you have a good query that you think would be useful to 
+others, please check out the [Contribution Guide](#how-to-contribute) below.
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/intrusus-dev/xql-hub.git
-   cd xql-hub
-   ```
+## Documentation
 
-2. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-3. Update MITRE ATT&CK data:
-   ```bash
-   python tools/update_mitre.py
-   ```
-
-4. Run the application:
-   ```bash
-   python main.py
-   ```
-
-5. Open your browser to `http://127.0.0.1:8000`
+| Document | Description |
+|----------|-------------|
+| [Setup Guide](docs/SETUP.md) | Installation, configuration, and deployment |
+| [API Reference](docs/API.md) | REST API endpoints and usage |
+| [Contributing](CONTRIBUTING.md) | How to contribute queries and code |
+| [Security](SECURITY.md) | Security policy and vulnerability reporting |
 
 ## How to Contribute
 
@@ -171,7 +163,7 @@ The wizard supports:
 
 Use our [contribution issue template](https://github.com/intrusus-dev/xql-hub/issues/new?template=contribution.yml) to submit your query for review.
 
-## Validation
+### Validation
 
 All contributions are automatically validated:
 
@@ -180,17 +172,6 @@ All contributions are automatically validated:
 - **BIOC constraints** - Dataset and event_type requirements
 - **MITRE ID format** - Must match pattern `T####` or `T####.###`
 - **Duplicate detection** - Checks for duplicate names and queries
-
-## API Endpoints
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/` | GET | Main application page |
-| `/contribute` | GET | Contribution wizard |
-| `/search` | GET | Search and filter queries |
-| `/api/filters` | GET | Available filter options |
-| `/api/content-types` | GET | Content type labels |
-| `/webhook/refresh` | POST | Refresh content (for GitHub webhooks) |
 
 ## Roadmap
 
