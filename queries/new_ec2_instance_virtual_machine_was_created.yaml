@@ -1,0 +1,19 @@
+name: "New EC2 Instance (Virtual Machine) was created"
+author: "Martin Ohl"
+description: "Identifies the execution of the Amazon Web Services (AWS) Command Line Interface (CLI) used to provision new virtual machines. While valid for administrative tasks, this activity can be indicative of unauthorized infrastructure expansion, such as an adversary spinning up instances for cryptomining or persistence."
+content_type: bioc
+severity: "Medium"
+bioc_category: "execution"
+event_type: "PROCESS"
+mitre_ids:
+  - "T1651"
+log_sources:
+  - "Cortex XDR Agent"
+tags:
+  - "AWS"
+  - "Persistence"
+  - "EC2"
+query: |
+  dataset = xdr_data
+  | filter event_type = PROCESS
+  | filter action_process_image_command_line ~= "aws ec2 run-instances"

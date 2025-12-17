@@ -1,0 +1,18 @@
+name: "Scheduled Task Creation and Modification Detection"
+author: "Leon Schulze"
+description: "Detects scheduled task creation or modification via schtasks.exe, PowerShell cmdlets, or COM objects. Adversaries use scheduled tasks for persistence and privilege escalation."
+content_type: bioc
+severity: "Informational"
+bioc_category: "persistence"
+event_type: "PROCESS"
+mitre_ids:
+  - "T1053.005"
+log_sources:
+  - "Cortex XDR Agent"
+tags:
+  - "Scheduled Tasks"
+query: |
+  dataset = xdr_data
+  | filter event_type = PROCESS
+  | filter (action_process_image_name = "powershell.exe" or action_process_image_name = "schtasks.exe" or action_process_image_name = "pwsh.exe" or action_process_image_name = "taskeng.exe")
+  | filter action_process_image_command_line = "*/create*" or action_process_image_command_line = "*Register-ScheduledTask*" or action_process_image_command_line = "*New-ScheduledTask*" or action_process_image_command_line = "*Set-ScheduledTask*" or action_process_image_command_line = "*Schedule.Service*" or action_process_image_command_line = "*RegisterTaskDefinition*"
