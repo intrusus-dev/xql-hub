@@ -1,0 +1,22 @@
+name: "File Upload to Cloud Storage Providers"
+author: "Leon Schulze"
+description: "This XQL query detects network activity involving the upload of significant amounts of data (greater than 1 MB) to external domains associated with popular public cloud storage and file-sharing services.
+
+Monitoring large data transfers to these services is critical for identifying potential data exfiltration attempts, where an adversary or insider threat moves sensitive internal data to a personal or attacker-controlled external repository."
+content_type: bioc
+severity: "High"
+bioc_category: "exfiltration"
+event_type: "NETWORK"
+mitre_ids:
+  - "T1567.002"
+log_sources:
+  - "Cortex XDR Agent"
+  - "Network Logs"
+tags:
+  - "File Upload"
+  - "Exfiltration"
+query: |
+  dataset = xdr_data 
+  | filter event_type = ENUM.NETWORK 
+  | filter action_external_hostname contains "amazonaws.com" or action_external_hostname contains "s3.amazonaws.com" or action_external_hostname contains "blob.core.windows.net" or action_external_hostname contains "storage.googleapis.com" or action_external_hostname contains "dropbox.com" or action_external_hostname contains "dropboxapi.com" or action_external_hostname contains "box.com" or action_external_hostname contains "mega.nz" or action_external_hostname contains "mega.io" or action_external_hostname contains "onedrive.live.com" or action_external_hostname contains "sharepoint.com" or action_external_hostname contains "pcloud.com" or action_external_hostname contains "api.box.com"
+  | filter action_total_upload > 1000000
